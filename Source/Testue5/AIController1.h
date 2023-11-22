@@ -22,11 +22,16 @@ class TESTUE5_API AAIController1 : public AAIController
 
 		void Tick(float DeltaTime) override;
 
+		void BeginPlay() override;
+
 protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
 	TArray<AWaypoints*> PatrolPoints;
 
 	int32 CurrentPatrolPointIndex;
+
+	void PopulateWaypointsInLevel();
+
 	
 };
