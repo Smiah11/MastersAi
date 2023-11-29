@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AIController.h"
-#include "Waypoints.h"
+#include "Waypoint_Manual.h"
 #include "AIController2.generated.h"
 
 /**
@@ -32,7 +32,7 @@ public:
 protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
-	TArray<AWaypoints*> PatrolPoints;
+	TArray<AWaypoint_Manual*> PatrolPoints;
 
 	int32 CurrentPatrolPointIndex;
 

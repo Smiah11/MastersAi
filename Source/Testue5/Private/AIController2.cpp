@@ -7,7 +7,7 @@
 #include "NavigationSystem.h"
 #include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "EngineUtils.h"
-#include "Waypoints.h"
+#include "Waypoint_Manual.h"
 
 
 AAIController2::AAIController2()
@@ -21,7 +21,6 @@ void AAIController2::BeginPlay()
 
     PopulateWaypointsArray();
 
-    SetupAI();// move to tick to fix
 
 
 }
@@ -32,7 +31,7 @@ void AAIController2::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
     MoveToNextWaypoint();
-   
+    SetupAI();// move to tick to fix
    
 }
 
@@ -47,7 +46,7 @@ void AAIController2::SetupAI()
         if (MovementComponent)
         {
 			// Set ground speed
-			MovementComponent->MaxWalkSpeed = 200.0f;
+			MovementComponent->MaxWalkSpeed = 600.0f;
 
 		}
 	}
@@ -55,9 +54,9 @@ void AAIController2::SetupAI()
 
 void AAIController2::PopulateWaypointsArray()
 {
-    for (TActorIterator<AWaypoints> ActorItr(GetWorld()); ActorItr; ++ActorItr)
+    for (TActorIterator<AWaypoint_Manual> ActorItr(GetWorld()); ActorItr; ++ActorItr)
     {
-        AWaypoints* Waypoint = *ActorItr;
+        AWaypoint_Manual* Waypoint = *ActorItr;
         if (Waypoint)
         {
             PatrolPoints.Add(Waypoint);

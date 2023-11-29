@@ -20,7 +20,7 @@ void AAIController1::BeginPlay()
 {
 	Super::BeginPlay();
 
-    SetupAI();
+   
 
     PopulateWaypointsInLevel();
 
@@ -29,8 +29,9 @@ void AAIController1::BeginPlay()
 
 void AAIController1::Tick(float DeltaTime)
 {
-    Super::Tick(DeltaTime);
-      MoveToNextWaypoint();
+    Super::Tick(DeltaTime); 
+    SetupAI();
+    MoveToNextWaypoint();
 }
 
 
@@ -44,7 +45,7 @@ void AAIController1::SetupAI()
         if (MovementComponent)
         {
             // Set ground speed
-            MovementComponent->MaxWalkSpeed = 200.0f;
+            MovementComponent->MaxWalkSpeed = 250.0f;
  
         }
     }
