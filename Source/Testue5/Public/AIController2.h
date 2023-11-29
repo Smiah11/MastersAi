@@ -5,28 +5,28 @@
 #include "CoreMinimal.h"
 #include "AIController.h"
 #include "Waypoints.h"
-#include "AIController1.generated.h"
-
+#include "AIController2.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class TESTUE5_API AAIController1 : public AAIController
+class TESTUE5_API AAIController2 : public AAIController
 {
 	GENERATED_BODY()
 
-	public:
 
-		AAIController1();
+public:
 
-		void Tick(float DeltaTime) override;
+	AAIController2();
 
-		void BeginPlay() override;
+	void Tick(float DeltaTime) override;
 
-		void SetupAI();
-		void MoveToNextWaypoint();
+	void BeginPlay() override;
 
+	void SetupAI();
+	void MoveToNextWaypoint();
+	
 
 
 protected:
@@ -36,7 +36,6 @@ protected:
 
 	int32 CurrentPatrolPointIndex;
 
-	void PopulateWaypointsInLevel();
+	void PopulateWaypointsArray();
 
-	
 };
