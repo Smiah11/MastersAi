@@ -7,36 +7,51 @@
 #include "Waypoints.h"
 #include "AIController1.generated.h"
 
+UENUM(BlueprintType)
+enum class EAIState : uint8
+{
+	Patrol,
+	ReactToPlayer
+};
 
-/**
- * 
- */
 UCLASS()
 class TESTUE5_API AAIController1 : public AAIController
 {
 	GENERATED_BODY()
 
-	public:
+public:
 
-		AAIController1();
+	AAIController1();
 
-		void Tick(float DeltaTime) override;
+	void Tick(float DeltaTime) override;
 
-		void BeginPlay() override;
+	void BeginPlay() override;
 
-		void SetupAI();
-		void MoveToNextWaypoint();
+	void SetupAI();
+	void MoveToNextWaypoint();
 
+	void ReactToPlayer();
 
+	void FacePlayer();
+
+	
 
 protected:
+
+	UPROPERTY (EditAnywhere, BlueprintReadWrite, Category = "AI")
+	float ReactionRadius;
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
 	TArray<AWaypoints*> PatrolPoints;
 
 	int32 CurrentPatrolPointIndex;
 
-	void PopulateWaypointsInLevel();
+	// State machine
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+	EAIState CurrentState;
 
-	
+	void SetAIState(EAIState NewState);
+
+	void PopulateWaypointsInLevel();
 };

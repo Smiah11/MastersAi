@@ -64,7 +64,7 @@ void AAIController2::PopulateWaypointsArray()
     }
 
     // Debug print to check the number of waypoints found
-    UE_LOG(LogTemp, Warning, TEXT("Number of Waypoints: %d"), PatrolPoints.Num());
+    //UE_LOG(LogTemp, Warning, TEXT("Number of Waypoints: %d"), PatrolPoints.Num());
 }
 
 void AAIController2::MoveToNextWaypoint()
@@ -105,8 +105,8 @@ void AAIController2::MoveToNextWaypoint()
         UAIBlueprintHelperLibrary::SimpleMoveToLocation(this, PatrolPoints[CurrentPatrolPointIndex]->GetActorLocation());
 
         // Debug prints
-        UE_LOG(LogTemp, Warning, TEXT("CurrentPatrolPointIndex: %d"), CurrentPatrolPointIndex);
-        UE_LOG(LogTemp, Warning, TEXT("Current Waypoint Location: %s"), *PatrolPoints[CurrentPatrolPointIndex]->GetActorLocation().ToString());
+        //UE_LOG(LogTemp, Warning, TEXT("CurrentPatrolPointIndex: %d"), CurrentPatrolPointIndex);
+       // UE_LOG(LogTemp, Warning, TEXT("Current Waypoint Location: %s"), *PatrolPoints[CurrentPatrolPointIndex]->GetActorLocation().ToString());
     }
 }
 
