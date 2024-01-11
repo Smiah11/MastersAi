@@ -20,8 +20,6 @@ AAIController1::AAIController1()
 {
 	CurrentPatrolPointIndex = 0;
 	CurrentState = EAIState::Patrol; // Default state is Patrol
-	ReactionRadius = 200.f;
-	
 	
 }
 
@@ -43,6 +41,7 @@ void AAIController1::Tick(float DeltaTime)
 	{
 	case EAIState::Patrol:
 		MoveToNextWaypoint();
+		AvoidOtherAI();
 		break;
 	case EAIState::ReactToPlayer:
 		ReactToPlayer();
@@ -61,7 +60,7 @@ void AAIController1::SetupAI()
 		if (MovementComponent)
 		{
 			// Set ground speed
-			MovementComponent->MaxWalkSpeed = 250.0f;
+			MovementComponent->MaxWalkSpeed = 150.f;
 		}
 	}
 }
@@ -71,11 +70,9 @@ void AAIController1::MoveToNextWaypoint()
 		ACharacter* MyCharacter = Cast<ACharacter>(GetPawn());
 		APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
 
-	if (PatrolPoints.Num() > 0)
+	if (PatrolPoints.Num() > 0 && MyCharacter)
 	{
-
-		if (MyCharacter)
-		{
+		
 			// Check if the AI is close to the current waypoint
 			float DistanceSquared = FVector::DistSquared(PatrolPoints[CurrentPatrolPointIndex]->GetActorLocation(), MyCharacter->GetActorLocation());
 			if (DistanceSquared < 100.f * 100.f)
@@ -111,8 +108,6 @@ void AAIController1::MoveToNextWaypoint()
 
 			// Move to the nearest waypoint
 			UAIBlueprintHelperLibrary::SimpleMoveToLocation(this, PatrolPoints[CurrentPatrolPointIndex]->GetActorLocation());
-
-		}
 
 	}
 		FVector AIForwardVector = MyCharacter->GetActorForwardVector();
@@ -163,24 +158,90 @@ void AAIController1::ReactToPlayer()
 void AAIController1::FacePlayer()
 {
 	ACharacter* MyCharacter = Cast<ACharacter>(GetPawn());
-	if (!MyCharacter)
-	{
-		UE_LOG(LogTemp, Error, TEXT("AAIController1::FacePlayer - MyCharacter is null!"));
-		return;
-	}
 
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
-	if (!PlayerPawn)
-	{
-		UE_LOG(LogTemp, Error, TEXT("AAIController1::FacePlayer - PlayerPawn is null!"));
-		return;
-	}
+	
 
 	FVector PlayerDirection = PlayerPawn->GetActorLocation() - MyCharacter->GetActorLocation();
 	PlayerDirection.Normalize();
 
 	FRotator NewRotation = PlayerDirection.Rotation();
 	MyCharacter->SetActorRotation(FMath::RInterpTo(MyCharacter->GetActorRotation(), NewRotation, GetWorld()->GetDeltaSeconds(), 5.0f));
+}
+
+
+void AAIController1::AvoidOtherAI()
+{
+	AvoidanceDistance = 100.f;
+	float WalkAroundDistance = 250.f; 
+	ACharacter* MyCharacter = Cast<ACharacter>(GetPawn());
+
+	if (MyCharacter && CurrentState == EAIState::Patrol)
+	{
+		// Iterate over nearby characters
+		TArray<AActor*> OtherAI;
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), ACharacter::StaticClass(), OtherAI);
+
+		for (AActor* OtherAIs : OtherAI)
+		{
+			if (OtherAIs == MyCharacter)
+			{
+				continue; // Skip itself
+			}
+
+			ACharacter* OtherAICharacter = Cast<ACharacter>(OtherAIs);
+			if (OtherAICharacter)
+			{
+				FVector PlayerLocation = UGameplayStatics::GetPlayerPawn(GetWorld(), 0)->GetActorLocation();
+				float DistanceToPlayer = FVector::Distance(PlayerLocation, MyCharacter->GetActorLocation());
+
+				// Skip the player
+				if (OtherAIs->IsA<APlayerController>())
+				{
+					continue;
+				}
+
+				float DistanceSquared = FVector::DistSquared(MyCharacter->GetActorLocation(), OtherAICharacter->GetActorLocation());
+
+				if (DistanceSquared < AvoidanceDistance * AvoidanceDistance)
+				{
+					// Calculate the avoidance vector
+					FVector AvoidanceVector = MyCharacter->GetActorLocation() - OtherAICharacter->GetActorLocation();
+					AvoidanceVector.Normalize();
+
+					// Check if the AI needs to walk around the obstacle
+					if (DistanceSquared < WalkAroundDistance * WalkAroundDistance)
+					{
+						// Calculate the new location to walk around the obstacle
+						FVector WalkAroundLocation = MyCharacter->GetActorLocation() + AvoidanceVector * WalkAroundDistance;
+
+						// Apply movement to walk around the obstacle
+						UAIBlueprintHelperLibrary::SimpleMoveToLocation(this, WalkAroundLocation);
+						//UE_LOG(LogTemp, Warning, TEXT("Walk around obstacle!"));
+						return;
+					}
+					else
+					{
+						// Adjust the location based on avoidance vector and distance
+						FVector AdjustedLocation = MyCharacter->GetActorLocation() + AvoidanceVector * AvoidanceDistance;
+
+						// Check if the adjusted location is close to the player
+						if (DistanceToPlayer < AvoidanceDistance)
+						{
+							// If it's close to the player, continue with normal movement
+							UAIBlueprintHelperLibrary::SimpleMoveToLocation(this, AdjustedLocation);
+						}
+						else
+						{
+							// Apply avoidance
+							UAIBlueprintHelperLibrary::SimpleMoveToLocation(this, AdjustedLocation);
+							//UE_LOG(LogTemp, Warning, TEXT("AvoidOtherAI called!"));
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 void AAIController1::SetAIState(EAIState NewState)

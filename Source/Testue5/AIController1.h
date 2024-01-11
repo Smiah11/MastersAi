@@ -34,13 +34,17 @@ public:
 
 	void FacePlayer();
 
+	void AvoidOtherAI();
+
+
 	
 
 protected:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+	float AvoidanceDistance;
 
 	UPROPERTY (EditAnywhere, BlueprintReadWrite, Category = "AI")
-	float ReactionRadius;
-
+	float ReactionRadius = 250.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
 	TArray<AWaypoints*> PatrolPoints;
@@ -54,4 +58,7 @@ protected:
 	void SetAIState(EAIState NewState);
 
 	void PopulateWaypointsInLevel();
+
+
+
 };
