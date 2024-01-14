@@ -34,7 +34,7 @@ public:
 
 	void FacePlayer();
 
-	void AvoidOtherAI();
+	//void AvoidOtherAI();
 
 
 	
@@ -54,6 +54,9 @@ protected:
 	// State machine
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
 	EAIState CurrentState;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animations")
+	UAnimMontage* ReactMontage;
 
 	void SetAIState(EAIState NewState);
 

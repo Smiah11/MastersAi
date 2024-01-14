@@ -21,6 +21,7 @@ AAIController1::AAIController1()
 	CurrentPatrolPointIndex = 0;
 	CurrentState = EAIState::Patrol; // Default state is Patrol
 	
+	
 }
 
 void AAIController1::BeginPlay()
@@ -41,7 +42,7 @@ void AAIController1::Tick(float DeltaTime)
 	{
 	case EAIState::Patrol:
 		MoveToNextWaypoint();
-		AvoidOtherAI();
+		//AvoidOtherAI();
 		break;
 	case EAIState::ReactToPlayer:
 		ReactToPlayer();
@@ -60,7 +61,8 @@ void AAIController1::SetupAI()
 		if (MovementComponent)
 		{
 			// Set ground speed
-			MovementComponent->MaxWalkSpeed = 150.f;
+			MovementComponent->MaxWalkSpeed = 250.f;
+			MovementComponent->SetAvoidanceEnabled(true); // Enable unreal's RVO avoidance system
 		}
 	}
 }
@@ -143,8 +145,12 @@ void AAIController1::ReactToPlayer()
 		//SetAIState(EAIState::ReactToPlayer);
 		// Player is within the specified radius 
 		StopMovement();   
-		
-		FacePlayer();   
+		FacePlayer();  
+		UAnimInstance* AnimInstance = MyCharacter->GetMesh()->GetAnimInstance();
+		if (AnimInstance)
+		{
+			AnimInstance->Montage_Play(ReactMontage, 1.0f);
+		}
 		
 	}
 	else
@@ -170,7 +176,10 @@ void AAIController1::FacePlayer()
 }
 
 
-void AAIController1::AvoidOtherAI()
+
+// avoidance code Kindof Worked but not really
+
+/*void AAIController1::AvoidOtherAI()
 {
 	AvoidanceDistance = 100.f;
 	float WalkAroundDistance = 250.f; 
@@ -242,7 +251,7 @@ void AAIController1::AvoidOtherAI()
 			}
 		}
 	}
-}
+}*/
 
 void AAIController1::SetAIState(EAIState NewState)
 {
