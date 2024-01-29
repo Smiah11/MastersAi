@@ -263,18 +263,10 @@ void AAIController1::SetAIState(EAIState NewState)
 void AAIController1::PopulateWaypointsInLevel()
 {
 	ACharacter* MyCharacter = Cast<ACharacter>(GetPawn());
-	if (!MyCharacter)
-	{
-		//UE_LOG(LogTemp, Error, TEXT("AAIController1::PopulateWaypointsInLevel - MyCharacter is null!"));
-		return;
-	}
+
 
 	UNavigationSystemV1* NavSystem = UNavigationSystemV1::GetNavigationSystem(GetWorld());
-	if (!NavSystem)
-	{
-		//UE_LOG(LogTemp, Error, TEXT("AAIController1::PopulateWaypointsInLevel - NavSystem is null!"));
-		return;
-	}
+
 
 	FNavLocation RandomLocation;
 	if (NavSystem->GetRandomReachablePointInRadius(MyCharacter->GetActorLocation(), 5000.f, RandomLocation))
