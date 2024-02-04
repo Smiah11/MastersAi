@@ -3,6 +3,7 @@
 
 #include "AICharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include <EnemyAIController.h>
 
 // Sets default values
 AAICharacter::AAICharacter()
@@ -27,6 +28,23 @@ void AAICharacter::BeginPlay()
 
     Move();
 	
+}
+
+float AAICharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+    float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+
+
+
+    // Check if the controller is of the specific AI controller class you're interested in
+    AEnemyAIController* EnemyAIController = Cast<AEnemyAIController>(GetController());
+    if (EnemyAIController)
+    {
+        // If the controller is the specific type and the character took damage, change its state
+        EnemyAIController->SetState(EAIState_Enemy::Attack);
+    }
+
+    return ActualDamage;
 }
 
 void AAICharacter::Move()

@@ -10,6 +10,8 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include <EnemyAIController.h>
+#include <Kismet/GameplayStatics.h>
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -86,6 +88,13 @@ void ATestue5Character::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ATestue5Character::Look);
+
+		// Sprinting
+		EnhancedInputComponent->BindAction(Sprint, ETriggerEvent::Triggered, this, &ATestue5Character::Sprinting);
+	
+
+		// Fire
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &ATestue5Character::Fire);
 	}
 	else
 	{
@@ -126,5 +135,65 @@ void ATestue5Character::Look(const FInputActionValue& Value)
 		// add yaw and pitch input to controller
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
+	}
+}
+
+void ATestue5Character::Sprinting(const FInputActionValue& Value)
+{
+	// input is a boolean
+	bool bSprint = Value.Get<bool>();
+
+	if (bSprint)
+	{
+		GetCharacterMovement()->MaxWalkSpeed = 1000.f;
+	}
+	else
+	{
+		GetCharacterMovement()->MaxWalkSpeed = 500.f;
+	}
+}
+
+void ATestue5Character::Fire(const FInputActionValue& Value)
+{
+		// input is a boolean
+	bool bFire = Value.Get<bool>();
+
+	float CurrentTime = GetWorld()->GetTimeSeconds();
+
+	if (bFire && (CurrentTime - LastFireTime >=FireRate))
+	{
+		FVector StartLocation = GetActorLocation() + FVector(0, 0, 50); // start location of the raycast
+		FRotator Direction = GetControlRotation(); // direction of the raycast
+		FVector EndLocation = StartLocation + (Direction.Vector() * 1000); // RAYCAST DISTANCE
+
+
+		FHitResult HitResult;
+		FCollisionQueryParams CollisionParams;
+		CollisionParams.AddIgnoredActor(this);
+
+		// Raycast
+		bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECC_Visibility, CollisionParams);
+
+		DrawDebugLine(GetWorld(), StartLocation, EndLocation, FColor::Purple, false, 1.f);
+
+
+
+		if (bHit && HitResult.GetActor())
+		{
+			// If we hit something, print the hit actor
+			UE_LOG(LogTemp, Warning, TEXT("Hit Actor: %s"), *HitResult.GetActor()->GetName());
+			const float Damage = 50.f;
+			UGameplayStatics::ApplyDamage(HitResult.GetActor(), Damage, GetController(), this, UDamageType::StaticClass());
+			//UE_LOG(LogTemp, Warning, TEXT("Damage Applied: %f"), Damage);
+
+		}
+		else
+		{
+			// If we didn't hit anything, print "No Hit"
+			UE_LOG(LogTemp, Warning, TEXT("No Hit"));
+		}
+		
+		LastFireTime = CurrentTime;
+
 	}
 }

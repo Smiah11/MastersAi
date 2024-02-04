@@ -48,6 +48,9 @@ void AEnemyAIController::Tick(float DeltaTime)
 	case EAIState_Enemy::Attack:
 		Attack();
 		break;
+	case EAIState_Enemy::Provokable:
+		Provoke(DeltaTime);
+		break;
 	}
 }
 
@@ -56,6 +59,8 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 	Super::OnPossess(InPawn);
 	SetupAI();
 }
+
+
 
 void AEnemyAIController::SetupAI()
 {
@@ -104,30 +109,39 @@ void AEnemyAIController::Attack()
 
 	if (PlayerPawn && MyCharacter)
 	{
-		float DistanceToPlayer = FVector::Dist(MyCharacter->GetActorLocation(), PlayerPawn->GetActorLocation());
-		float CurrentTime = GetWorld()->GetTimeSeconds();
 
-		if (DistanceToPlayer <= AttackRange)
-		{
-			MoveToActor(PlayerPawn, AttackDistance);
+		FVector StartLocation = MyCharacter->GetActorLocation();
+		FVector EndLocation = PlayerPawn->GetActorLocation();
+		//FHitResult HitResult;
+		//bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECC_Visibility);
 
-			if (DistanceToPlayer <= AttackDistance && CurrentTime - LastAttackTime > AttackCooldown)
+			float DistanceToPlayer = FVector::Dist(StartLocation, EndLocation);
+			float CurrentTime = GetWorld()->GetTimeSeconds();
+
+			if (DistanceToPlayer <= AttackRange)
 			{
-				UE_LOG(LogTemp, Warning, TEXT("Attacking Player at distance: %f"), DistanceToPlayer);
-				// Attack the player
-				UGameplayStatics::ApplyDamage(PlayerPawn, AttackDamage, this, MyCharacter, nullptr);
-				DrawDebugString(GetWorld(), MyCharacter->GetActorLocation(), TEXT("Attacking!"), nullptr, FColor::Red, 0.5, true);
+				MoveToActor(PlayerPawn, AttackDistance);
 
-				LastAttackTime = CurrentTime; // Update the last attack time
+				if (DistanceToPlayer <= AttackDistance && CurrentTime - LastAttackTime > AttackCooldown)
+				{
+				
+					
+					UE_LOG(LogTemp, Warning, TEXT("Attacking Player at distance: %f"), DistanceToPlayer);
+					// Attack the player
+					UGameplayStatics::ApplyDamage(PlayerPawn, AttackDamage, GetInstigatorController(), MyCharacter, nullptr);
+					DrawDebugLine(GetWorld(), StartLocation, EndLocation, FColor::Red, false, 1.f, 0.f, 1.f);
+
+					LastAttackTime = CurrentTime; // Update the last attack time
+					
+				}
 			}
-		}
-		else
-		{
+			else
+			{
 
 			//UE_LOG(LogTemp, Warning, TEXT("Patrolling to waypoint index: %d"), CurrentPatrolPointIndex);
 			// Player is too far away, switch back to patrol
 			SetState(EAIState_Enemy::Patrol);
-		}
+			}
 	}
 }
 
@@ -195,14 +209,14 @@ void AEnemyAIController::OnTargetDetected(AActor* Actor, FAIStimulus Stimulus)
 
 	if (Stimulus.WasSuccessfullySensed() && Actor == PlayerPawn) // Check for sight/sound stimulus
 	{
-		SetState(EAIState_Enemy::Attack);
+		SetState(EAIState_Enemy::Provokable);
 		DetectedPlayer = Actor;
 		FacePlayer();
 		UE_LOG(LogTemp, Warning, TEXT("Detected Actor: %s, at Location: %s"), *Actor->GetName(), *Actor->GetActorLocation().ToString());
 	}
 	else if (DistanceToPlayer <= AttackRange) // Additional check for distance
 	{
-		SetState(EAIState_Enemy::Attack);
+		SetState(EAIState_Enemy::Provokable);
 		DetectedPlayer = PlayerPawn; 
 		FacePlayer();
 	}
@@ -256,4 +270,35 @@ void AEnemyAIController::FacePlayer()
 
 	FRotator NewRotation = PlayerDirection.Rotation();
 	MyCharacter->SetActorRotation(FMath::RInterpTo(MyCharacter->GetActorRotation(), NewRotation, GetWorld()->GetDeltaSeconds(), 5.0f));
+}
+
+void AEnemyAIController::Provoke(float DeltaTime)
+{
+	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
+	StopMovement();
+	if (PlayerPawn)
+	{
+		float DistanceToPlayer = FVector::Dist(GetPawn()->GetActorLocation(), PlayerPawn->GetActorLocation());
+
+		// Check if the player is within the provocation distance
+		if (DistanceToPlayer <= ProvokableDistance)
+		{
+			FacePlayer();
+			PlayerProximityTime += DeltaTime;
+			DrawDebugString(GetWorld(), FVector(0, 0, 100), FString::Printf(TEXT("Player Proximity Time: %f"), PlayerProximityTime), GetPawn(), FColor::Red, 0.0f, true);
+
+			// If the player has been within provocation distance for longer than the threshold, provoke the AI
+			if (PlayerProximityTime >= ProvokableTime)
+			{
+				//DrawDebugString(GetWorld(), FVector(0, 200, 100), FString::Printf(TEXT("Provoked!")), GetPawn(), FColor::Red, 3.0f, true);
+				SetState(EAIState_Enemy::Attack);
+			}
+		}
+		else
+		{
+			// Reset proximity time if the player is outside the provocation distance
+			PlayerProximityTime = 0;
+			SetState(EAIState_Enemy::Patrol);
+		}
+	}
 }

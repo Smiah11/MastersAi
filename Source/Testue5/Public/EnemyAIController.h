@@ -16,7 +16,8 @@ UENUM(BlueprintType)
 enum class EAIState_Enemy : uint8
 {
 	Patrol,
-	Attack	
+	Attack,
+	Provokable
 };
 
 UCLASS()
@@ -34,6 +35,9 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void OnPossess(APawn* InPawn) override;
 
+	
+
+	void SetState(EAIState_Enemy NewState);
 
 protected:
 
@@ -57,14 +61,17 @@ private:
 	float AttackDistance = 300.f;
 	float LastAttackTime; 
 	const float AttackCooldown = 2.0f; 
+	float ProvokableDistance = 500.f;
+	float ProvokableTime = 5.f;
+	float PlayerProximityTime = 0.f;
 
-	void SetState(EAIState_Enemy NewState);
+	
 	void Patrol();//same as MoveToNextWaypoint in AIController1.h
 	void Attack();
 	void SetupAI();
 	void PopulateWaypointsInLevel();
 	void FacePlayer();
-
+	void Provoke( float DeltaTime);
 
 
 
