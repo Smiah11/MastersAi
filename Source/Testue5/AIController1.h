@@ -5,14 +5,29 @@
 #include "CoreMinimal.h"
 #include "AIController.h"
 #include "Waypoints.h"
+#include <AICharacter.h>
 #include "AIController1.generated.h"
+
 
 UENUM(BlueprintType)
 enum class EAIState : uint8
 {
 	Patrol,
-	ReactToPlayer
+	ReactToPlayer,
+	GoToWork,
+	GoHome,
+	GoShop
 };
+
+struct CivillianActionUtility
+{
+	EAIState Action;
+	float Utility;
+
+	CivillianActionUtility(EAIState InAction, float InUtility): Action(InAction), Utility(InUtility) {}
+};
+
+
 
 UCLASS()
 class TESTUE5_API AAIController1 : public AAIController
@@ -35,6 +50,47 @@ public:
 	void FacePlayer();
 
 	//void AvoidOtherAI();
+
+	void UpdateCurrentTime(float DeltaTime);
+
+	void InitialiseLocations();
+
+
+
+private:
+
+	float CalculatePatrolUtility() const;
+
+	float CalculateReactToPlayerUtility() const;
+
+	float CalculateGoToWorkUtility() const;
+
+	float CalculateGoHomeUtility() const;
+
+	float CalculateGoShopUtility() const;
+
+	void ExecuteAction(EAIState Action);
+
+	CivillianActionUtility ChooseBestAction(const TArray<CivillianActionUtility>& ActionUtilities) const;
+
+	
+
+
+	
+	float HungerThreshold = 50.f;
+	float TirednessThreshold = 75.f;
+	float WorkStart = 8.f; // 8am
+	float WorkEnd = 15.f; // 3pm
+
+	
+	float CurrentTime = 0.f; // Current time of day
+	float CurrentHour= 0.f; // Current hour of day
+
+
+	// Locations
+	FVector WorkLocation;
+	FVector HomeLocation;
+	FVector ShoppingLocation;
 
 
 	
@@ -61,6 +117,12 @@ protected:
 	void SetAIState(EAIState NewState);
 
 	void PopulateWaypointsInLevel();
+
+	void GoToWork();
+
+	void GoHome();
+
+	void GoShop();
 
 
 

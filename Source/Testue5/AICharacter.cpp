@@ -19,12 +19,24 @@ AAICharacter::AAICharacter()
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 
 
+    HungerLevel = 0.f; // starts not hungry
+    TirednessLevel = 0.f; // starts not tired
+
+    HungerIncreaseRate = 1.f; // 1 per second
+    TirednessIncreaseRate = 0.5f; // .5 per second
+
+
+
+
 }
 
 // Called when the game starts or when spawned
 void AAICharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+    LastHungerUpdateTime = GetWorld()->GetTimeSeconds();
+    LastTirednessUpdateTime = GetWorld()->GetTimeSeconds();
 
     Move();
 	
@@ -75,6 +87,37 @@ void AAICharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+    float CurrentTime = GetWorld()->GetTimeSeconds();
+
+    if (CurrentTime - LastHungerUpdateTime >= 1.f)  // Update every second
+    {
+        HungerLevel += HungerIncreaseRate * (CurrentTime - LastHungerUpdateTime);
+        LastHungerUpdateTime = CurrentTime;
+    }
+
+    
+    if (CurrentTime - LastTirednessUpdateTime >= 1.f) 
+    { 
+        TirednessLevel += TirednessIncreaseRate * (CurrentTime - LastTirednessUpdateTime);
+        LastTirednessUpdateTime = CurrentTime;
+    }
+
+    //clamp values
+    HungerLevel = FMath::Clamp(HungerLevel, 0.f, 100.f);
+    TirednessLevel = FMath::Clamp(TirednessLevel, 0.f, 100.f);
+	
+
+}
+
+
+float AAICharacter::GetHungerLevel() const
+{
+	return HungerLevel;
+}
+
+float AAICharacter::GetTirednessLevel() const
+{
+	return TirednessLevel;
 }
 
 // Called to bind functionality to input

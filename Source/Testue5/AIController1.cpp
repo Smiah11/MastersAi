@@ -13,13 +13,14 @@
 #include "Kismet/GameplayStatics.h"
 
 
+
 //Civillian Controller
 
 
 AAIController1::AAIController1()
 {
 	CurrentPatrolPointIndex = 0;
-	CurrentState = EAIState::Patrol; // Default state is Patrol
+	//CurrentState = EAIState::Patrol; // Default state is Patrol
 	
 	
 }
@@ -29,6 +30,7 @@ void AAIController1::BeginPlay()
 	Super::BeginPlay();
 	PopulateWaypointsInLevel();
 	SetupAI();
+	InitialiseLocations();
 
 }
 
@@ -38,6 +40,9 @@ void AAIController1::Tick(float DeltaTime)
 
 	Super::Tick(DeltaTime);
 
+	UpdateCurrentTime(DeltaTime);
+
+	/*
 	switch (CurrentState)
 	{
 	case EAIState::Patrol:
@@ -48,7 +53,20 @@ void AAIController1::Tick(float DeltaTime)
 		ReactToPlayer();
 		break;
 
-	}
+	}*/
+
+
+	TArray<CivillianActionUtility> ActionUtilities = {
+	{EAIState::Patrol, CalculatePatrolUtility()},
+	{EAIState::ReactToPlayer, CalculateReactToPlayerUtility()},
+	{EAIState::GoToWork, CalculateGoToWorkUtility()},
+	{EAIState::GoHome, CalculateGoHomeUtility()},
+	{EAIState::GoShop, CalculateGoShopUtility()}
+	};
+
+	CivillianActionUtility BestAction = ChooseBestAction(ActionUtilities);
+	ExecuteAction(BestAction.Action);
+
 }
 
 void AAIController1::SetupAI()
@@ -69,12 +87,15 @@ void AAIController1::SetupAI()
 
 void AAIController1::MoveToNextWaypoint()
 {
+	
 		ACharacter* MyCharacter = Cast<ACharacter>(GetPawn());
 		APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
 
-	if (PatrolPoints.Num() > 0 && MyCharacter)
-	{
 		
+
+		if (PatrolPoints.Num() > 0 && MyCharacter)
+		{
+
 			// Check if the AI is close to the current waypoint
 			float DistanceSquared = FVector::DistSquared(PatrolPoints[CurrentPatrolPointIndex]->GetActorLocation(), MyCharacter->GetActorLocation());
 			if (DistanceSquared < 100.f * 100.f)
@@ -111,24 +132,9 @@ void AAIController1::MoveToNextWaypoint()
 			// Move to the nearest waypoint
 			UAIBlueprintHelperLibrary::SimpleMoveToLocation(this, PatrolPoints[CurrentPatrolPointIndex]->GetActorLocation());
 
-	}
-		FVector AIForwardVector = MyCharacter->GetActorForwardVector();
-		FVector PlayerDirection = PlayerPawn->GetActorLocation() - MyCharacter->GetActorLocation();
-		PlayerDirection.Normalize();
-
-		float DotProduct = FVector::DotProduct(AIForwardVector, PlayerDirection);
-		float DistanceToPlayer = FVector::Distance(PlayerPawn->GetActorLocation(), MyCharacter->GetActorLocation());
-
-		if (DotProduct > 0.8f && DistanceToPlayer < ReactionRadius)
-		{
-			
-			SetAIState(EAIState::ReactToPlayer);
 		}
-		else
-		{
-			
-			SetAIState(EAIState::Patrol);
-		}
+
+
 }
 
 void AAIController1::ReactToPlayer()
@@ -153,12 +159,7 @@ void AAIController1::ReactToPlayer()
 		}
 		
 	}
-	else
-	{
-		// Continue with normal movement 
-		
-		SetAIState(EAIState::Patrol);
-	}
+
 }
 
 void AAIController1::FacePlayer()
@@ -175,8 +176,156 @@ void AAIController1::FacePlayer()
 	MyCharacter->SetActorRotation(FMath::RInterpTo(MyCharacter->GetActorRotation(), NewRotation, GetWorld()->GetDeltaSeconds(), 5.0f));
 }
 
+void AAIController1::UpdateCurrentTime(float DeltaTime)
+{
+	CurrentTime += DeltaTime;
+
+	float SecondsInADay = 24 * 60 * 60 / 600; // 10 minutes in real life is 24 hours in game
+
+	CurrentHour = 8.f; //FMath::Fmod(CurrentTime, SecondsInADay) / 3600; // Convert seconds to hours
+
+	UE_LOG(LogTemp, Warning, TEXT("Current Hour: %f"), CurrentHour);
+}
+
+float AAIController1::CalculatePatrolUtility() const
+{
+	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
+	float DistanceToPlayer = FVector::Distance(GetPawn()->GetActorLocation(), PlayerPawn->GetActorLocation());
+	float Utility = DistanceToPlayer / 1000.0f;
+	UE_LOG(LogTemp, Log, TEXT("Patrol Utility: %f"), Utility);
+	return Utility;
+}
+
+float AAIController1::CalculateReactToPlayerUtility() const
+{
+	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
+	float DistanceToPlayer = FVector::Distance(GetPawn()->GetActorLocation(), PlayerPawn->GetActorLocation());
+	float Utility = (DistanceToPlayer < ReactionRadius) ? (ReactionRadius - DistanceToPlayer) / ReactionRadius : 0.0f;
+	UE_LOG(LogTemp, Log, TEXT("ReactToPlayer Utility: %f"), Utility);
+	return Utility;
+}
+
+float AAIController1::CalculateGoToWorkUtility() const
+{
+	bool IsWorkTime = CurrentHour >= WorkStart && CurrentHour < WorkEnd;
+	float Utility = IsWorkTime ? 1.0f : 0.0f;
+	UE_LOG(LogTemp, Log, TEXT("GoToWork Utility: %f"), Utility);
+	return Utility;
+}
+
+float AAIController1::CalculateGoHomeUtility() const
+{
+	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
+	float TirednessLevel = MyCharacter->GetTirednessLevel(); 
+	bool IsPastWorkHours = CurrentHour >= WorkEnd;
+	float Utility = (TirednessLevel > TirednessThreshold || IsPastWorkHours) ? 1.0f : 0.0f;
+	UE_LOG(LogTemp, Log, TEXT("GoHome Utility: %f"), Utility);
+	return Utility;
+}
+
+float AAIController1::CalculateGoShopUtility() const
+{
+	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
+	float HungerLevel = MyCharacter->GetHungerLevel(); 
+	float Utility = (HungerLevel > HungerThreshold) ? 1.0f : 0.0f;
+	UE_LOG(LogTemp, Log, TEXT("GoShop Utility: %f"), Utility);
+	return Utility;
+}
+
+CivillianActionUtility AAIController1::ChooseBestAction(const TArray<CivillianActionUtility>& ActionUtilities) const {
+
+	check(ActionUtilities.Num() > 0); // Ensure there's at least one action
+
+	CivillianActionUtility BestAction = ActionUtilities[0]; // Start with the first action as the best choice
+	for (const auto& ActionUtility : ActionUtilities) {
+		if (ActionUtility.Utility > BestAction.Utility) {
+			BestAction = ActionUtility; // Found a better action
+		}
+	}
+
+	return BestAction;
+}
+
+void AAIController1::ExecuteAction(EAIState Action)
+{
+	switch (Action) {
+	case EAIState::Patrol:
+		MoveToNextWaypoint();
+		break;
+	case EAIState::ReactToPlayer:
+		ReactToPlayer();
+		break;
+	case EAIState::GoToWork:
+		
+		GoToWork();
+		break;
+	case EAIState::GoHome:
+		
+		GoHome();
+		break;
+	case EAIState::GoShop:
+		
+		GoShop();
+		break;
+	default:
+		UE_LOG(LogTemp, Warning, TEXT("Unhandled action in ExecuteAction"));
+		break;
 
 
+	}
+}
+
+
+void AAIController1::InitialiseLocations() {
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	// Find Work Location
+	TArray<AActor*> WorkActors;
+	UGameplayStatics::GetAllActorsWithTag(World, FName("Work"), WorkActors);
+	UE_LOG(LogTemp, Warning, TEXT("Found %d Work location(s)"), WorkActors.Num());
+	if (WorkActors.Num() > 0) {
+		WorkLocation = WorkActors[0]->GetActorLocation(); // Assuming the first found actor is the target
+	}
+
+	// Find Home Location
+	TArray<AActor*> HomeActors;
+	UGameplayStatics::GetAllActorsWithTag(World, FName("Home"), HomeActors);
+	UE_LOG(LogTemp, Warning, TEXT("Found %d Home location(s)"), HomeActors.Num());
+	if (HomeActors.Num() > 0) {
+		HomeLocation = HomeActors[0]->GetActorLocation();
+	}
+
+	// Find Shopping Location
+	TArray<AActor*> ShopActors;
+	UGameplayStatics::GetAllActorsWithTag(World, FName("Shop"), ShopActors);
+	UE_LOG(LogTemp, Warning, TEXT("Found %d Shop location(s)"), ShopActors.Num());
+
+	if (ShopActors.Num() > 0) {
+		ShoppingLocation = ShopActors[0]->GetActorLocation();
+	}
+}
+
+void AAIController1::GoToWork()
+{
+	MoveToLocation(WorkLocation, 100.f, true);
+	StopMovement();
+}
+
+void AAIController1::GoHome()
+{
+	MoveToLocation(HomeLocation, 100.f, true);
+	StopMovement();
+}
+
+void AAIController1::GoShop()
+{
+	MoveToLocation(ShoppingLocation, 100.f, true);
+	StopMovement();
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // avoidance code Kindof Worked but not really
 
 /*void AAIController1::AvoidOtherAI()
@@ -253,13 +402,14 @@ void AAIController1::FacePlayer()
 	}
 }*/
 
+
+/*
 void AAIController1::SetAIState(EAIState NewState)
 {
 		CurrentState = NewState;
 		//UE_LOG(LogTemp, Warning, TEXT("AI State set to %s"), *UEnum::GetValueAsString(NewState));
 }
-
-
+*/
 void AAIController1::PopulateWaypointsInLevel()
 {
 	ACharacter* MyCharacter = Cast<ACharacter>(GetPawn());
@@ -286,3 +436,7 @@ void AAIController1::PopulateWaypointsInLevel()
 	// Debug print to check the number of waypoints found
 	//UE_LOG(LogTemp, Warning, TEXT("Number of Waypoints: %d"), PatrolPoints.Num());
 }
+
+
+
+

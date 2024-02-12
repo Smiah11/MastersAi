@@ -40,4 +40,18 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+	float GetHungerLevel() const;
+	float GetTirednessLevel() const;
+
+private:
+
+	float LastHungerUpdateTime;
+	float LastTirednessUpdateTime;
+
+	float HungerLevel;
+	float TirednessLevel;
+
+	float HungerIncreaseRate;
+	float TirednessIncreaseRate;
+
 };
