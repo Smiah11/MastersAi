@@ -22,8 +22,8 @@ AAICharacter::AAICharacter()
     HungerLevel = 0.f; // starts not hungry
     TirednessLevel = 0.f; // starts not tired
 
-    HungerIncreaseRate = 1.f; // 1 per second
-    TirednessIncreaseRate = 0.5f; // .5 per second
+    HungerIncreaseRate = 0.5f; // 1 per second
+    TirednessIncreaseRate = 0.1f; // .5 per second
 
 
 
@@ -118,6 +118,49 @@ float AAICharacter::GetHungerLevel() const
 float AAICharacter::GetTirednessLevel() const
 {
 	return TirednessLevel;
+}
+
+void AAICharacter::IncreaseHunger(float Amount)
+{
+    HungerLevel += Amount;
+  
+}
+
+void AAICharacter::IncreaseTiredness(float Amount)
+{
+	TirednessLevel += Amount;
+}
+
+void AAICharacter::DecreaseHunger(float Amount)
+{
+    	HungerLevel -= Amount;
+    
+
+}
+
+void AAICharacter::DecreaseTiredness(float Amount)
+{
+	TirednessLevel -= Amount;
+}
+
+float AAICharacter::GetHungerIncreaseRate() const
+{
+    return HungerIncreaseRate;
+}
+
+float AAICharacter::GetTirednessIncreaseRate() const
+{
+    return TirednessIncreaseRate;
+}
+
+void AAICharacter::SetHungerIncreaseRate(float NewRate)
+{
+	HungerIncreaseRate = NewRate;
+}
+
+void AAICharacter::SetTirednessIncreaseRate(float NewRate)
+{
+    	TirednessIncreaseRate = NewRate;
 }
 
 // Called to bind functionality to input

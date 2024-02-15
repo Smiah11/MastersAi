@@ -55,6 +55,14 @@ public:
 
 	void InitialiseLocations();
 
+	TArray<CivillianActionUtility> CalculateCurrentUtilities();
+
+	void DecideNextAction();
+
+	void DecreaseHungerValue();
+
+	//float CalculatePriorityUtility() const;
+
 
 
 private:
@@ -71,20 +79,33 @@ private:
 
 	void ExecuteAction(EAIState Action);
 
+	const float HighPriorityModifier = 2.f;
+	const float LowPriorityModifier = 0.5f;
+	const float MediumPriorityModifier = 1.5f;
+
+
 	CivillianActionUtility ChooseBestAction(const TArray<CivillianActionUtility>& ActionUtilities) const;
 
+	FTimerHandle WaitTimer;
+
+	void Wait();
+
 	
 
 
 	
-	float HungerThreshold = 50.f;
-	float TirednessThreshold = 75.f;
+	float HungerThreshold = 100.f;
+	float TirednessThreshold = 100.f;
 	float WorkStart = 8.f; // 8am
 	float WorkEnd = 15.f; // 3pm
 
 	
 	float CurrentTime = 0.f; // Current time of day
 	float CurrentHour= 0.f; // Current hour of day
+
+
+	float TirednessDecreaseRate = 2.f;
+	float HungerDecreaseRate = 4.f;
 
 
 	// Locations
@@ -117,6 +138,8 @@ protected:
 	void SetAIState(EAIState NewState);
 
 	void PopulateWaypointsInLevel();
+
+	bool IsAtLocation(const FVector& Location, float Radius) const;
 
 	void GoToWork();
 

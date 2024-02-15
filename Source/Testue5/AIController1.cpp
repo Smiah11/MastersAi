@@ -21,6 +21,7 @@ AAIController1::AAIController1()
 {
 	CurrentPatrolPointIndex = 0;
 	//CurrentState = EAIState::Patrol; // Default state is Patrol
+	PrimaryActorTick.TickInterval = 1.f;
 	
 	
 }
@@ -42,30 +43,24 @@ void AAIController1::Tick(float DeltaTime)
 
 	UpdateCurrentTime(DeltaTime);
 
-	/*
-	switch (CurrentState)
-	{
-	case EAIState::Patrol:
-		MoveToNextWaypoint();
-		//AvoidOtherAI();
-		break;
-	case EAIState::ReactToPlayer:
-		ReactToPlayer();
-		break;
+	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
 
-	}*/
+	UE_LOG(LogTemp, Log, TEXT("At Shop - Tiredness: %f, Hunger: %f"), MyCharacter->GetTirednessLevel(), MyCharacter->GetHungerLevel());
 
+	//float PriorityUtility = CalculatePriorityUtility();
 
 	TArray<CivillianActionUtility> ActionUtilities = {
-	{EAIState::Patrol, CalculatePatrolUtility()},
-	{EAIState::ReactToPlayer, CalculateReactToPlayerUtility()},
-	{EAIState::GoToWork, CalculateGoToWorkUtility()},
-	{EAIState::GoHome, CalculateGoHomeUtility()},
-	{EAIState::GoShop, CalculateGoShopUtility()}
+	{EAIState::Patrol, CalculatePatrolUtility() }, // Patrol has a lower priority than other actions
+	{EAIState::ReactToPlayer, CalculateReactToPlayerUtility() },
+	{EAIState::GoToWork, CalculateGoToWorkUtility() },
+	{EAIState::GoHome, CalculateGoHomeUtility() },
+	{EAIState::GoShop, CalculateGoShopUtility() }
 	};
 
 	CivillianActionUtility BestAction = ChooseBestAction(ActionUtilities);
 	ExecuteAction(BestAction.Action);
+
+	
 
 }
 
@@ -88,9 +83,11 @@ void AAIController1::SetupAI()
 void AAIController1::MoveToNextWaypoint()
 {
 	
-		ACharacter* MyCharacter = Cast<ACharacter>(GetPawn());
+		AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
 		APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
-
+		MyCharacter->IncreaseTiredness(MyCharacter->GetTirednessIncreaseRate());
+		MyCharacter->IncreaseHunger(MyCharacter->GetHungerIncreaseRate());
+;
 		
 
 		if (PatrolPoints.Num() > 0 && MyCharacter)
@@ -182,17 +179,18 @@ void AAIController1::UpdateCurrentTime(float DeltaTime)
 
 	float SecondsInADay = 24 * 60 * 60 / 600; // 10 minutes in real life is 24 hours in game
 
-	CurrentHour = 8.f; //FMath::Fmod(CurrentTime, SecondsInADay) / 3600; // Convert seconds to hours
+	CurrentHour = FMath::Fmod(CurrentTime, SecondsInADay) / 3600; // Convert seconds to hours
 
-	UE_LOG(LogTemp, Warning, TEXT("Current Hour: %f"), CurrentHour);
+	//UE_LOG(LogTemp, Warning, TEXT("Current Hour: %f"), CurrentHour);
 }
 
 float AAIController1::CalculatePatrolUtility() const
 {
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
 	float DistanceToPlayer = FVector::Distance(GetPawn()->GetActorLocation(), PlayerPawn->GetActorLocation());
-	float Utility = DistanceToPlayer / 1000.0f;
+	float Utility = (DistanceToPlayer / 1000.0f) * LowPriorityModifier;
 	UE_LOG(LogTemp, Log, TEXT("Patrol Utility: %f"), Utility);
+	//UE_LOG(LogTemp, Log, TEXT("Patrol Utility Before Modifier: %f, Modifier: %f, Utility After Modifier: %f"), DistanceToPlayer / 1000.0f, LowPriorityModifier, Utility);
 	return Utility;
 }
 
@@ -201,7 +199,7 @@ float AAIController1::CalculateReactToPlayerUtility() const
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
 	float DistanceToPlayer = FVector::Distance(GetPawn()->GetActorLocation(), PlayerPawn->GetActorLocation());
 	float Utility = (DistanceToPlayer < ReactionRadius) ? (ReactionRadius - DistanceToPlayer) / ReactionRadius : 0.0f;
-	UE_LOG(LogTemp, Log, TEXT("ReactToPlayer Utility: %f"), Utility);
+	//UE_LOG(LogTemp, Log, TEXT("ReactToPlayer Utility: %f"), Utility);
 	return Utility;
 }
 
@@ -210,7 +208,7 @@ float AAIController1::CalculateGoToWorkUtility() const
 	bool IsWorkTime = CurrentHour >= WorkStart && CurrentHour < WorkEnd;
 	float Utility = IsWorkTime ? 1.0f : 0.0f;
 	UE_LOG(LogTemp, Log, TEXT("GoToWork Utility: %f"), Utility);
-	return Utility;
+	return Utility * HighPriorityModifier;
 }
 
 float AAIController1::CalculateGoHomeUtility() const
@@ -218,8 +216,8 @@ float AAIController1::CalculateGoHomeUtility() const
 	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
 	float TirednessLevel = MyCharacter->GetTirednessLevel(); 
 	bool IsPastWorkHours = CurrentHour >= WorkEnd;
-	float Utility = (TirednessLevel > TirednessThreshold || IsPastWorkHours) ? 1.0f : 0.0f;
-	UE_LOG(LogTemp, Log, TEXT("GoHome Utility: %f"), Utility);
+	float Utility = (TirednessLevel >= TirednessThreshold) ? 1.0f : 0.0f;
+	//UE_LOG(LogTemp, Log, TEXT("GoHome Utility: %f"), Utility);
 	return Utility;
 }
 
@@ -227,8 +225,8 @@ float AAIController1::CalculateGoShopUtility() const
 {
 	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
 	float HungerLevel = MyCharacter->GetHungerLevel(); 
-	float Utility = (HungerLevel > HungerThreshold) ? 1.0f : 0.0f;
-	UE_LOG(LogTemp, Log, TEXT("GoShop Utility: %f"), Utility);
+	float Utility = ((HungerLevel >= HungerThreshold) ? 1.0f : 0.0f) * MediumPriorityModifier; 
+	//UE_LOG(LogTemp, Log, TEXT("GoShop Utility: %f"), Utility);
 	return Utility;
 }
 
@@ -246,6 +244,12 @@ CivillianActionUtility AAIController1::ChooseBestAction(const TArray<CivillianAc
 	return BestAction;
 }
 
+void AAIController1::Wait()
+{
+	GetWorld()->GetTimerManager().SetTimer(WaitTimer, this, &AAIController1::DecreaseHungerValue, 5.f, false);
+	UE_LOG(LogTemp, Warning, TEXT("Waiting for 5 seconds"));
+}
+
 void AAIController1::ExecuteAction(EAIState Action)
 {
 	switch (Action) {
@@ -256,11 +260,9 @@ void AAIController1::ExecuteAction(EAIState Action)
 		ReactToPlayer();
 		break;
 	case EAIState::GoToWork:
-		
 		GoToWork();
 		break;
 	case EAIState::GoHome:
-		
 		GoHome();
 		break;
 	case EAIState::GoShop:
@@ -283,7 +285,7 @@ void AAIController1::InitialiseLocations() {
 	// Find Work Location
 	TArray<AActor*> WorkActors;
 	UGameplayStatics::GetAllActorsWithTag(World, FName("Work"), WorkActors);
-	UE_LOG(LogTemp, Warning, TEXT("Found %d Work location(s)"), WorkActors.Num());
+	//UE_LOG(LogTemp, Warning, TEXT("Found %d Work location(s)"), WorkActors.Num());
 	if (WorkActors.Num() > 0) {
 		WorkLocation = WorkActors[0]->GetActorLocation(); // Assuming the first found actor is the target
 	}
@@ -291,7 +293,7 @@ void AAIController1::InitialiseLocations() {
 	// Find Home Location
 	TArray<AActor*> HomeActors;
 	UGameplayStatics::GetAllActorsWithTag(World, FName("Home"), HomeActors);
-	UE_LOG(LogTemp, Warning, TEXT("Found %d Home location(s)"), HomeActors.Num());
+	//UE_LOG(LogTemp, Warning, TEXT("Found %d Home location(s)"), HomeActors.Num());
 	if (HomeActors.Num() > 0) {
 		HomeLocation = HomeActors[0]->GetActorLocation();
 	}
@@ -299,30 +301,130 @@ void AAIController1::InitialiseLocations() {
 	// Find Shopping Location
 	TArray<AActor*> ShopActors;
 	UGameplayStatics::GetAllActorsWithTag(World, FName("Shop"), ShopActors);
-	UE_LOG(LogTemp, Warning, TEXT("Found %d Shop location(s)"), ShopActors.Num());
+	//UE_LOG(LogTemp, Warning, TEXT("Found %d Shop location(s)"), ShopActors.Num());
 
 	if (ShopActors.Num() > 0) {
 		ShoppingLocation = ShopActors[0]->GetActorLocation();
 	}
 }
 
+TArray<CivillianActionUtility> AAIController1::CalculateCurrentUtilities() {
+	TArray<CivillianActionUtility> actionUtilities;
+
+
+	actionUtilities.Add({ EAIState::Patrol, CalculatePatrolUtility() });
+	actionUtilities.Add({ EAIState::ReactToPlayer, CalculateReactToPlayerUtility() });
+	actionUtilities.Add({ EAIState::GoToWork, CalculateGoToWorkUtility() });
+	actionUtilities.Add({ EAIState::GoHome, CalculateGoHomeUtility() });
+	actionUtilities.Add({ EAIState::GoShop, CalculateGoShopUtility() });
+
+	return actionUtilities;
+}
+
+void AAIController1::DecideNextAction()
+{
+	CivillianActionUtility nextAction = ChooseBestAction(CalculateCurrentUtilities());
+	ExecuteAction(nextAction.Action);
+}
+
+void AAIController1::DecreaseHungerValue()
+{
+	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
+	MyCharacter->DecreaseHunger(100.f);
+	UE_LOG(LogTemp, Log, TEXT("Hunger decreased. New value: %f"), MyCharacter->GetHungerLevel());
+}
+
+
+
+/*
+float AAIController1::CalculatePriorityUtility() const
+{
+
+	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
+	float TirednessLevel = MyCharacter->GetTirednessLevel();	
+	float HungerLevel = MyCharacter->GetHungerLevel();
+
+
+	// assigns weight to the tiredness and hunger levels to prioritise one over the other
+	float WeightedTiredness = TirednessLevel * 3.f;
+	float WeightedHunger = HungerLevel * 2.f;
+
+
+	// calculates the combined utility of the tiredness and hunger levels because the AI will prioritise the one with the highest utility
+	float CombinedUtility = WeightedTiredness + WeightedHunger;
+
+	return CombinedUtility;
+}
+*/
+
+bool AAIController1::IsAtLocation(const FVector& Location, float Radius) const
+{
+	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
+	if (!MyCharacter) return false;
+
+	return FVector::DistSquared(MyCharacter->GetActorLocation(), Location) <= FMath::Square(Radius);
+}
+
 void AAIController1::GoToWork()
 {
-	MoveToLocation(WorkLocation, 100.f, true);
-	StopMovement();
+
+	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
+
+
+	if (!IsAtLocation(WorkLocation, 500.f))
+	{
+		MoveToLocation(WorkLocation, 500.f, true);
+	}
+	else {
+
+		MyCharacter->IncreaseTiredness(MyCharacter->GetTirednessIncreaseRate() * GetWorld()->GetDeltaSeconds());
+		MyCharacter->IncreaseHunger(MyCharacter->GetHungerIncreaseRate() * GetWorld()->GetDeltaSeconds());
+
+		StopMovement();
+	
+	}
+
 }
 
 void AAIController1::GoHome()
 {
-	MoveToLocation(HomeLocation, 100.f, true);
-	StopMovement();
+	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
+
+	if (!IsAtLocation(HomeLocation, 500.f))
+	{
+		MoveToLocation(HomeLocation, 500.f, true);
+	}
+	else {
+
+		MyCharacter->DecreaseTiredness(TirednessDecreaseRate * GetWorld()->GetDeltaSeconds());
+		MyCharacter->IncreaseHunger(MyCharacter->GetHungerIncreaseRate() * GetWorld()->GetDeltaSeconds());
+		StopMovement();
+	}
+	
 }
 
 void AAIController1::GoShop()
 {
-	MoveToLocation(ShoppingLocation, 100.f, true);
-	StopMovement();
+
+	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
+
+	if (!IsAtLocation(ShoppingLocation, 500.f))
+	{
+		MoveToLocation(ShoppingLocation, 250.f, true); // bring the AI closer to the shop
+		//
+	}
+	else {
+
+		StopMovement();
+		Wait();
+		//MyCharacter->IncreaseTiredness(MyCharacter->GetTirednessIncreaseRate() * GetWorld()->GetDeltaSeconds());
+		
+
+	}
+	
 }
+
+
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -43,6 +43,18 @@ public:
 	float GetHungerLevel() const;
 	float GetTirednessLevel() const;
 
+	void IncreaseHunger(float Amount);
+	void IncreaseTiredness(float Amount);
+
+	void DecreaseHunger(float Amount);
+	void DecreaseTiredness(float Amount);
+
+	float GetHungerIncreaseRate() const;
+	float GetTirednessIncreaseRate() const;
+
+	void SetHungerIncreaseRate(float NewRate);
+	void SetTirednessIncreaseRate(float NewRate);
+
 private:
 
 	float LastHungerUpdateTime;
