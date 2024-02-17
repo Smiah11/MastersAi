@@ -10,6 +10,8 @@
 #include "EngineUtils.h"
 #include "Waypoints.h"
 #include "DrawDebugHelpers.h"
+#include "AIController.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "Kismet/GameplayStatics.h"
 
 
@@ -21,7 +23,8 @@ AAIController1::AAIController1()
 {
 	CurrentPatrolPointIndex = 0;
 	//CurrentState = EAIState::Patrol; // Default state is Patrol
-	PrimaryActorTick.TickInterval = 1.f;
+	//PrimaryActorTick.TickInterval = 1.f;
+	PrimaryActorTick.bCanEverTick = false;
 	
 	
 }
@@ -33,6 +36,11 @@ void AAIController1::BeginPlay()
 	SetupAI();
 	InitialiseLocations();
 
+	// Set up a timer to update the AI every 2 seconds reducing tick reliance
+	GetWorld()->GetTimerManager().SetTimer(UpdateTimer, this, &AAIController1::OnUpdate, 2.f, true,0.f);
+
+	//OnUpdate();
+
 }
 
 void AAIController1::Tick(float DeltaTime)
@@ -41,14 +49,15 @@ void AAIController1::Tick(float DeltaTime)
 
 	Super::Tick(DeltaTime);
 
-	UpdateCurrentTime(DeltaTime);
+	//UpdateCurrentTime(DeltaTime);
 
-	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
+	//AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
 
-	UE_LOG(LogTemp, Log, TEXT("At Shop - Tiredness: %f, Hunger: %f"), MyCharacter->GetTirednessLevel(), MyCharacter->GetHungerLevel());
+	//UE_LOG(LogTemp, Log, TEXT("At Shop - Tiredness: %f, Hunger: %f"), MyCharacter->GetTirednessLevel(), MyCharacter->GetHungerLevel());
 
 	//float PriorityUtility = CalculatePriorityUtility();
 
+	/*
 	TArray<CivillianActionUtility> ActionUtilities = {
 	{EAIState::Patrol, CalculatePatrolUtility() }, // Patrol has a lower priority than other actions
 	{EAIState::ReactToPlayer, CalculateReactToPlayerUtility() },
@@ -60,7 +69,7 @@ void AAIController1::Tick(float DeltaTime)
 	CivillianActionUtility BestAction = ChooseBestAction(ActionUtilities);
 	ExecuteAction(BestAction.Action);
 
-	
+	*/
 
 }
 
@@ -81,57 +90,85 @@ void AAIController1::SetupAI()
 }
 
 void AAIController1::MoveToNextWaypoint()
-{
-	
+{			
+
+	if (PatrolPoints.Num() > 0 && CurrentPatrolPointIndex < PatrolPoints.Num())
+	{
 		AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
-		APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
-		MyCharacter->IncreaseTiredness(MyCharacter->GetTirednessIncreaseRate());
-		MyCharacter->IncreaseHunger(MyCharacter->GetHungerIncreaseRate());
-;
-		
 
-		if (PatrolPoints.Num() > 0 && MyCharacter)
+		AWaypoints* NextWaypoint = PatrolPoints[CurrentPatrolPointIndex];
+		if (NextWaypoint)
 		{
+			
+			FaceLocation(NextWaypoint->GetActorLocation());
+			MoveToActor(NextWaypoint, 50.f, true);
+		}
+	}
+	else
+	{
+		
+		UE_LOG(LogTemp, Warning, TEXT("No waypoints available or index out of bounds."));
+	}
 
-			// Check if the AI is close to the current waypoint
-			float DistanceSquared = FVector::DistSquared(PatrolPoints[CurrentPatrolPointIndex]->GetActorLocation(), MyCharacter->GetActorLocation());
-			if (DistanceSquared < 100.f * 100.f)
+}
+
+bool AAIController1::FindSuitableNewWaypointLocation(FVector& OutLocation, float MinDistance, int MaxRetries)
+{
+	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
+	UNavigationSystemV1* NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	FNavLocation RandomLocation;
+
+	for (int RetryCount = 0; RetryCount < MaxRetries; ++RetryCount)
+	{
+		if (NavSystem && NavSystem->GetRandomPointInNavigableRadius(MyCharacter->GetActorLocation(), 2000.0f, RandomLocation))
+		{
+			FVector NewLocation = RandomLocation.Location;
+			if (FVector::DistSquared(NewLocation, MyCharacter->GetActorLocation()) >= FMath::Square(MinDistance))
 			{
-				// Destroy the current waypoint
-				PatrolPoints[CurrentPatrolPointIndex]->Destroy();
-				//UE_LOG(LogTemp, Warning, TEXT("Destroyed Waypoint at: %s"), *PatrolPoints[CurrentPatrolPointIndex]->GetActorLocation().ToString());
-
-				// Spawn a new waypoint
-				FNavLocation RandomLocation;
-				UNavigationSystemV1* NavSystem = UNavigationSystemV1::GetNavigationSystem(GetWorld());
-				if (NavSystem && NavSystem->GetRandomReachablePointInRadius(MyCharacter->GetActorLocation(), 1000.f, RandomLocation))
-				{
-					AWaypoints* NewWaypoint = GetWorld()->SpawnActor<AWaypoints>(AWaypoints::StaticClass(), RandomLocation.Location, FRotator::ZeroRotator);
-					if (NewWaypoint)
-					{
-						PatrolPoints[CurrentPatrolPointIndex] = NewWaypoint;
-
-						// Display debug sphere for the new waypoint if the AI is currently following a path
-						if (CurrentState == EAIState::Patrol)
-						{
-							DrawDebugSphere(GetWorld(), RandomLocation.Location, 50.0f, 12, FColor::Green, false, 2.0f);
-						}
-
-						//UE_LOG(LogTemp, Warning, TEXT("Generated New Waypoint at: %s"), *RandomLocation.Location.ToString());
-					}
-				}
-
-				// Update to the next waypoint
-				CurrentPatrolPointIndex = (CurrentPatrolPointIndex + 1) % PatrolPoints.Num();
-				//UE_LOG(LogTemp, Warning, TEXT("MoveToNextWaypoint called!"));
+				OutLocation = NewLocation;
+				return true; // Successful in finding a suitable location
 			}
+		}
+	}
 
-			// Move to the nearest waypoint
-			UAIBlueprintHelperLibrary::SimpleMoveToLocation(this, PatrolPoints[CurrentPatrolPointIndex]->GetActorLocation());
+	return false; // Failed to find a suitable location
+}
 
+void AAIController1::SpawnNewWaypoint()
+{
+	FVector NewLocation;
+	const float MinDistance = 500.f; // Minimum distance from the current waypoint
+	const int MaxRetries = 10; // Maximum number of attempts to find a suitable location
+
+	if (FindSuitableNewWaypointLocation(NewLocation, MinDistance, MaxRetries))
+	{
+		// Destroy the current waypoint before spawning a new one
+		if (PatrolPoints.IsValidIndex(CurrentPatrolPointIndex))
+		{
+			AWaypoints* CurrentWaypoint = PatrolPoints[CurrentPatrolPointIndex];
+			if (CurrentWaypoint)
+			{
+				CurrentWaypoint->Destroy();
+				PatrolPoints.RemoveAt(CurrentPatrolPointIndex);
+			}
 		}
 
+		// Spawn the new waypoint
+		AWaypoints* NewWaypoint = GetWorld()->SpawnActor<AWaypoints>(AWaypoints::StaticClass(), NewLocation, FRotator::ZeroRotator);
+		if (NewWaypoint)
+		{
+			PatrolPoints.Add(NewWaypoint);
+			CurrentPatrolPointIndex = PatrolPoints.Num() - 1; // Move to the newly spawned waypoint next
 
+	
+			DrawDebugSphere(GetWorld(), NewLocation, 50.f, 12, FColor::Green, false, 3.f);
+			UE_LOG(LogTemp, Warning, TEXT("New waypoint spawned at: %s"), *NewLocation.ToString());
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to find a suitable location for a new waypoint after %d retries."), MaxRetries);
+	}
 }
 
 void AAIController1::ReactToPlayer()
@@ -173,15 +210,27 @@ void AAIController1::FacePlayer()
 	MyCharacter->SetActorRotation(FMath::RInterpTo(MyCharacter->GetActorRotation(), NewRotation, GetWorld()->GetDeltaSeconds(), 5.0f));
 }
 
+void AAIController1::FaceLocation(const FVector& Location)
+{
+	APawn* MyPawn = GetPawn();
+	if (MyPawn)
+	{
+		FVector Direction = (Location - MyPawn->GetActorLocation()).GetSafeNormal();
+		FRotator TargetRotation = FVector::VectorPlaneProject(Direction, FVector::UpVector).Rotation();
+
+		MyPawn->SetActorRotation(TargetRotation);
+	}
+}
+
 void AAIController1::UpdateCurrentTime(float DeltaTime)
 {
 	CurrentTime += DeltaTime;
 
 	float SecondsInADay = 24 * 60 * 60 / 600; // 10 minutes in real life is 24 hours in game
 
-	CurrentHour = FMath::Fmod(CurrentTime, SecondsInADay) / 3600; // Convert seconds to hours
+	CurrentHour = FMath::Fmod(CurrentTime, SecondsInADay) / (SecondsInADay/24.f);// Convert seconds to hours
 
-	//UE_LOG(LogTemp, Warning, TEXT("Current Hour: %f"), CurrentHour);
+	UE_LOG(LogTemp, Warning, TEXT("Current Hour: %f"), CurrentHour);
 }
 
 float AAIController1::CalculatePatrolUtility() const
@@ -189,7 +238,7 @@ float AAIController1::CalculatePatrolUtility() const
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
 	float DistanceToPlayer = FVector::Distance(GetPawn()->GetActorLocation(), PlayerPawn->GetActorLocation());
 	float Utility = (DistanceToPlayer / 1000.0f) * LowPriorityModifier;
-	UE_LOG(LogTemp, Log, TEXT("Patrol Utility: %f"), Utility);
+	//UE_LOG(LogTemp, Log, TEXT("Patrol Utility: %f"), Utility);
 	//UE_LOG(LogTemp, Log, TEXT("Patrol Utility Before Modifier: %f, Modifier: %f, Utility After Modifier: %f"), DistanceToPlayer / 1000.0f, LowPriorityModifier, Utility);
 	return Utility;
 }
@@ -198,7 +247,7 @@ float AAIController1::CalculateReactToPlayerUtility() const
 {
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
 	float DistanceToPlayer = FVector::Distance(GetPawn()->GetActorLocation(), PlayerPawn->GetActorLocation());
-	float Utility = (DistanceToPlayer < ReactionRadius) ? (ReactionRadius - DistanceToPlayer) / ReactionRadius : 0.0f;
+	float Utility = (DistanceToPlayer < ReactionRadius) ? (ReactionRadius - DistanceToPlayer) / ReactionRadius : 0.f;
 	//UE_LOG(LogTemp, Log, TEXT("ReactToPlayer Utility: %f"), Utility);
 	return Utility;
 }
@@ -206,8 +255,8 @@ float AAIController1::CalculateReactToPlayerUtility() const
 float AAIController1::CalculateGoToWorkUtility() const
 {
 	bool IsWorkTime = CurrentHour >= WorkStart && CurrentHour < WorkEnd;
-	float Utility = IsWorkTime ? 1.0f : 0.0f;
-	UE_LOG(LogTemp, Log, TEXT("GoToWork Utility: %f"), Utility);
+	float Utility = IsWorkTime ? 1.f : 0.f;
+	//UE_LOG(LogTemp, Log, TEXT("GoToWork Utility: %f"), Utility);
 	return Utility * HighPriorityModifier;
 }
 
@@ -216,7 +265,7 @@ float AAIController1::CalculateGoHomeUtility() const
 	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
 	float TirednessLevel = MyCharacter->GetTirednessLevel(); 
 	bool IsPastWorkHours = CurrentHour >= WorkEnd;
-	float Utility = (TirednessLevel >= TirednessThreshold) ? 1.0f : 0.0f;
+	float Utility = (TirednessLevel >= TirednessThreshold) ? 1.f : 0.f;
 	//UE_LOG(LogTemp, Log, TEXT("GoHome Utility: %f"), Utility);
 	return Utility;
 }
@@ -225,7 +274,7 @@ float AAIController1::CalculateGoShopUtility() const
 {
 	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
 	float HungerLevel = MyCharacter->GetHungerLevel(); 
-	float Utility = ((HungerLevel >= HungerThreshold) ? 1.0f : 0.0f) * MediumPriorityModifier; 
+	float Utility = ((HungerLevel >= HungerThreshold) ? 1.f : 0.f) * MediumPriorityModifier; 
 	//UE_LOG(LogTemp, Log, TEXT("GoShop Utility: %f"), Utility);
 	return Utility;
 }
@@ -244,11 +293,21 @@ CivillianActionUtility AAIController1::ChooseBestAction(const TArray<CivillianAc
 	return BestAction;
 }
 
-void AAIController1::Wait()
+void AAIController1::OnUpdate()
+{
+	UpdateCurrentTime(GetWorld()->GetDeltaSeconds());
+	DecideNextAction();
+
+	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
+	UE_LOG(LogTemp, Log, TEXT("At Shop - Tiredness: %f, Hunger: %f"), MyCharacter->GetTirednessLevel(), MyCharacter->GetHungerLevel());
+
+}
+
+/*void AAIController1::Wait()
 {
 	GetWorld()->GetTimerManager().SetTimer(WaitTimer, this, &AAIController1::DecreaseHungerValue, 5.f, false);
 	UE_LOG(LogTemp, Warning, TEXT("Waiting for 5 seconds"));
-}
+}*/
 
 void AAIController1::ExecuteAction(EAIState Action)
 {
@@ -324,6 +383,7 @@ TArray<CivillianActionUtility> AAIController1::CalculateCurrentUtilities() {
 void AAIController1::DecideNextAction()
 {
 	CivillianActionUtility nextAction = ChooseBestAction(CalculateCurrentUtilities());
+	UE_LOG(LogTemp, Warning, TEXT("Deciding next action: %d with utility %f"), nextAction.Action, nextAction.Utility);
 	ExecuteAction(nextAction.Action);
 }
 
@@ -331,7 +391,42 @@ void AAIController1::DecreaseHungerValue()
 {
 	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
 	MyCharacter->DecreaseHunger(100.f);
+	DecideNextAction();
 	UE_LOG(LogTemp, Log, TEXT("Hunger decreased. New value: %f"), MyCharacter->GetHungerLevel());
+}
+
+void AAIController1::DecreaseTirednessValue()
+{
+	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
+	MyCharacter->DecreaseTiredness(100.f);
+	DecideNextAction();
+	UE_LOG(LogTemp, Log, TEXT("Tiredness decreased. New value: %f"), MyCharacter->GetHungerLevel());
+}
+
+void AAIController1::DecreaseTirednessAndHungerValue()
+{
+	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
+	MyCharacter->DecreaseHunger(100.f);
+	MyCharacter->DecreaseTiredness(100.f);
+	DecideNextAction();
+
+}
+
+
+void AAIController1::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
+{
+	Super::OnMoveCompleted(RequestID, Result);
+
+	if (Result.IsSuccess())
+	{
+
+		SpawnNewWaypoint();
+		FTimerHandle TimerHandle;
+		GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &AAIController1::DecideNextAction, 0.1f, false);
+		//DecideNextAction();
+		
+	}
+
 }
 
 
@@ -373,7 +468,8 @@ void AAIController1::GoToWork()
 
 	if (!IsAtLocation(WorkLocation, 500.f))
 	{
-		MoveToLocation(WorkLocation, 500.f, true);
+		MoveToLocation(WorkLocation, 250.f, true);
+		FaceLocation(WorkLocation);
 	}
 	else {
 
@@ -389,16 +485,20 @@ void AAIController1::GoToWork()
 void AAIController1::GoHome()
 {
 	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
+	FTimerHandle RestTimer;
 
 	if (!IsAtLocation(HomeLocation, 500.f))
 	{
-		MoveToLocation(HomeLocation, 500.f, true);
+		MoveToLocation(HomeLocation, 250.f, true);
+		FaceLocation(HomeLocation);
 	}
-	else {
+	else
+	{
 
-		MyCharacter->DecreaseTiredness(TirednessDecreaseRate * GetWorld()->GetDeltaSeconds());
-		MyCharacter->IncreaseHunger(MyCharacter->GetHungerIncreaseRate() * GetWorld()->GetDeltaSeconds());
 		StopMovement();
+		GetWorld()->GetTimerManager().SetTimer(RestTimer, this, &AAIController1::DecreaseTirednessAndHungerValue, 10.f, false);
+		
+		
 	}
 	
 }
@@ -407,18 +507,19 @@ void AAIController1::GoShop()
 {
 
 	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
+	FTimerHandle ShoppingTimer;
 
 	if (!IsAtLocation(ShoppingLocation, 500.f))
 	{
 		MoveToLocation(ShoppingLocation, 250.f, true); // bring the AI closer to the shop
+		FaceLocation(ShoppingLocation);
 		//
 	}
 	else {
 
 		StopMovement();
-		Wait();
+		GetWorld()->GetTimerManager().SetTimer(ShoppingTimer, this, &AAIController1::DecreaseHungerValue, 5.f, false);
 		//MyCharacter->IncreaseTiredness(MyCharacter->GetTirednessIncreaseRate() * GetWorld()->GetDeltaSeconds());
-		
 
 	}
 	

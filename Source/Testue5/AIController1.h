@@ -45,9 +45,17 @@ public:
 	void SetupAI();
 	void MoveToNextWaypoint();
 
+	bool FindSuitableNewWaypointLocation(FVector& OutLocation, float MinDistance, int MaxRetries);
+
+	void SpawnNewWaypoint();
+
+	//void GenerateAndMoveToNextWaypoint(const FVector& NearLocation);
+
 	void ReactToPlayer();
 
 	void FacePlayer();
+
+	void FaceLocation(const FVector& Location);
 
 	//void AvoidOtherAI();
 
@@ -60,6 +68,12 @@ public:
 	void DecideNextAction();
 
 	void DecreaseHungerValue();
+
+	void DecreaseTirednessValue();
+
+	void DecreaseTirednessAndHungerValue();
+
+	void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
 
 	//float CalculatePriorityUtility() const;
 
@@ -87,11 +101,15 @@ private:
 	CivillianActionUtility ChooseBestAction(const TArray<CivillianActionUtility>& ActionUtilities) const;
 
 	FTimerHandle WaitTimer;
+	FTimerHandle UpdateTimer;
 
-	void Wait();
+	void OnUpdate();
 
+	//void Wait();
+
+	bool bIsWaiting;
 	
-
+	float MinDistanceBetweenPoints = 300.f;
 
 	
 	float HungerThreshold = 100.f;
@@ -103,9 +121,6 @@ private:
 	float CurrentTime = 0.f; // Current time of day
 	float CurrentHour= 0.f; // Current hour of day
 
-
-	float TirednessDecreaseRate = 2.f;
-	float HungerDecreaseRate = 4.f;
 
 
 	// Locations

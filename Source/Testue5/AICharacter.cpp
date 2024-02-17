@@ -10,6 +10,8 @@ AAICharacter::AAICharacter()
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
+    //tick every second
+    PrimaryActorTick.TickInterval = 1.0f;
 
 	GetCharacterMovement()->JumpZVelocity = 700.f;
 	GetCharacterMovement()->AirControl = 0.35f;
@@ -22,9 +24,10 @@ AAICharacter::AAICharacter()
     HungerLevel = 0.f; // starts not hungry
     TirednessLevel = 0.f; // starts not tired
 
-    HungerIncreaseRate = 0.5f; // 1 per second
-    TirednessIncreaseRate = 0.1f; // .5 per second
-
+    
+    HungerIncreaseRate = 1.f;
+    TirednessIncreaseRate = 0.5f; 
+     
 
 
 
@@ -87,20 +90,10 @@ void AAICharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-    float CurrentTime = GetWorld()->GetTimeSeconds();
+    //update hunger and tiredness levels with their rates
 
-    if (CurrentTime - LastHungerUpdateTime >= 1.f)  // Update every second
-    {
-        HungerLevel += HungerIncreaseRate * (CurrentTime - LastHungerUpdateTime);
-        LastHungerUpdateTime = CurrentTime;
-    }
-
-    
-    if (CurrentTime - LastTirednessUpdateTime >= 1.f) 
-    { 
-        TirednessLevel += TirednessIncreaseRate * (CurrentTime - LastTirednessUpdateTime);
-        LastTirednessUpdateTime = CurrentTime;
-    }
+    HungerLevel+= HungerIncreaseRate * DeltaTime;
+    TirednessLevel+= TirednessIncreaseRate * DeltaTime;
 
     //clamp values
     HungerLevel = FMath::Clamp(HungerLevel, 0.f, 100.f);
