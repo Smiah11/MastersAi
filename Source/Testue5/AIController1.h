@@ -55,6 +55,8 @@ public:
 
 	void FacePlayer();
 
+	void StopFacingPlayer();
+
 	void FaceLocation(const FVector& Location);
 
 	//void AvoidOtherAI();
@@ -93,6 +95,8 @@ private:
 
 	void ExecuteAction(EAIState Action);
 
+
+	const float HigherPriorityModifier = 10.f;
 	const float HighPriorityModifier = 2.f;
 	const float LowPriorityModifier = 0.5f;
 	const float MediumPriorityModifier = 1.5f;
@@ -102,6 +106,7 @@ private:
 
 	FTimerHandle WaitTimer;
 	FTimerHandle UpdateTimer;
+	FTimerHandle TimerFacePlayer;
 
 	void OnUpdate();
 
