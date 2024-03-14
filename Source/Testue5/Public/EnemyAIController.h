@@ -20,6 +20,14 @@ enum class EAIState_Enemy : uint8
 	Provokable
 };
 
+struct EnemyActionUtility
+{
+	EAIState_Enemy Action;
+	float Utility;
+
+	EnemyActionUtility(EAIState_Enemy InAction, float InUtility) : Action(InAction), Utility(InUtility) {}
+};
+
 UCLASS()
 class TESTUE5_API AEnemyAIController : public AAIController
 {
@@ -37,12 +45,33 @@ public:
 
 	
 
-	void SetState(EAIState_Enemy NewState);
+	TArray<EnemyActionUtility> CalculateEnemyUtilities();
+	EnemyActionUtility ChooseBestAction(const TArray<EnemyActionUtility>& EnemyActionUtilities) const;
+
+	float CalculatePatrolUtility() const;
+	float CalculateAttackUtility() const;
+	float CalculateProvokableUtility() const;
+
+	void DecideNextAction();
+
+	void ExecuteAction(EAIState_Enemy Action);
+	void SetProvoked();
+
+	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
+
+	void SetInRestrictedZone(bool bRestricted);
+
+	bool bInRestrictedZone;
+
 
 protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
 	class UAISenseConfig_Sight* SightConfig;
+
+	bool FindSuitableNewWaypointLocation(FVector& OutLocation, float MinDistance, int MaxRetries);
+
+	void SpawnNewWaypoint();
 
 	UFUNCTION()
 	void OnTargetDetected(AActor* Actor, FAIStimulus Stimilus);
@@ -56,22 +85,39 @@ private:
 
 	EAIState_Enemy CurrentState;
 	AActor* DetectedPlayer;
-	float AttackRange = 500.f;
+	float AttackRange = 400.f;
 	float AttackDamage = 10.f;
-	float AttackDistance = 300.f;
+	float AttackDistance = 250.f;
 	float LastAttackTime; 
 	const float AttackCooldown = 2.0f; 
 	float ProvokableDistance = 500.f;
 	float ProvokableTime = 5.f;
 	float PlayerProximityTime = 0.f;
 
+	AActor* LastMovedToActor = nullptr; // Last actor moved to
+
+
+	//Utility Modifiers
+
+	float PatrolUtilityModifier = 1.5f;
+	float AttackUtilityModifier = 1.f;
+	float ProvokableUtilityModifier = 3.f;
+
+
+	float LastProvokedTime = 0;
+
+	bool bIsProvoked;
+
+
+
 	
-	void Patrol();//same as MoveToNextWaypoint in AIController1.h
 	void Attack();
+	void MoveToNextWaypoint();
 	void SetupAI();
 	void PopulateWaypointsInLevel();
 	void FacePlayer();
-	void Provoke( float DeltaTime);
+	void Provoke();
+
 
 
 

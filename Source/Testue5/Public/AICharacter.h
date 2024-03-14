@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "EnemyAIController.h"
 #include "AICharacter.generated.h"
 
 UCLASS()
@@ -65,5 +66,6 @@ private:
 
 	float HungerIncreaseRate;
 	float TirednessIncreaseRate;
+
 
 };

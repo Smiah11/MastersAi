@@ -71,7 +71,7 @@ public:
 
 	void DecreaseTirednessAndHungerValue();
 
-	void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
+	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
 
 	//float CalculatePriorityUtility() const;
 
@@ -153,7 +153,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animations")
 	UAnimMontage* ReactMontage;
 
-	void SetAIState(EAIState NewState);
 
 	void PopulateWaypointsInLevel();
 

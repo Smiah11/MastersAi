@@ -6,10 +6,13 @@
 #include "GameFramework/Character.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "DrawDebugHelpers.h"
+#include "AIController.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "NavigationSystem.h"
 #include <GameFramework/CharacterMovementComponent.h>
+#include "Navigation/PathFollowingComponent.h"
+#include <AICharacter.h>
 
 
 
@@ -17,7 +20,7 @@ AEnemyAIController::AEnemyAIController()
 {
 
 	CurrentPatrolPointIndex = 0;
-	CurrentState = EAIState_Enemy::Patrol;
+	
 
 	//Initialise Perception Components
 	SetPerceptionComponent(*CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("Perception Component")));
@@ -25,6 +28,12 @@ AEnemyAIController::AEnemyAIController()
 	GetPerceptionComponent()->SetDominantSense(*SightConfig->GetSenseImplementation());
 	GetPerceptionComponent()->OnTargetPerceptionUpdated.AddDynamic(this, &AEnemyAIController::OnTargetDetected);
 	GetPerceptionComponent()->ConfigureSense(*SightConfig);
+
+	PrimaryActorTick.TickInterval = 0.1f;
+
+	bIsProvoked = false;
+
+	bInRestrictedZone = false;
 	
 }
 
@@ -33,6 +42,8 @@ void AEnemyAIController::BeginPlay()
 	Super::BeginPlay();
 	SetupAI();
 	PopulateWaypointsInLevel();
+
+
 	
 } 
 
@@ -40,18 +51,9 @@ void AEnemyAIController::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	switch (CurrentState)
-	{
-	case EAIState_Enemy::Patrol:
-		Patrol();
-		break;
-	case EAIState_Enemy::Attack:
-		Attack();
-		break;
-	case EAIState_Enemy::Provokable:
-		Provoke(DeltaTime);
-		break;
-	}
+	DecideNextAction();
+
+
 }
 
 void AEnemyAIController::OnPossess(APawn* InPawn)
@@ -90,14 +92,89 @@ void AEnemyAIController::SetupAI()
 	}
 }
 
-
-void AEnemyAIController::SetState(EAIState_Enemy NewState)
+TArray<EnemyActionUtility> AEnemyAIController::CalculateEnemyUtilities()
 {
+	TArray<EnemyActionUtility> EnemyUtilities;
 
-	UE_LOG(LogTemp, Warning, TEXT("Changing state from %d to %d"), CurrentState, NewState);
-	CurrentState = NewState;
+	// Calculate the utility of each action
+	EnemyUtilities.Add({ EAIState_Enemy::Patrol, CalculatePatrolUtility() });
+	EnemyUtilities.Add({ EAIState_Enemy::Attack, CalculateAttackUtility() });
+	EnemyUtilities.Add({ EAIState_Enemy::Provokable, CalculateProvokableUtility() });
+
+	return EnemyUtilities;
+}
+
+EnemyActionUtility AEnemyAIController::ChooseBestAction(const TArray<EnemyActionUtility>& EnemyActionUtilities) const
+{
+	check(EnemyActionUtilities.Num() > 0); // Ensure there's at least one action
+
+	EnemyActionUtility BestAction = EnemyActionUtilities[0]; // Start with the first action as the best choice
+	for (const auto& ActionUtility : EnemyActionUtilities) {
+		if (ActionUtility.Utility > BestAction.Utility) {
+			BestAction = ActionUtility; // Found a better action
+		}
+	}
+
+	return BestAction;
+}
+
+float AEnemyAIController::CalculatePatrolUtility() const
+{
+	auto* Player = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
+
+	float DistanceToPlayer = FVector::Dist(Player->GetActorLocation(), GetPawn()->GetActorLocation());
+
+	float Utility = DistanceToPlayer / 1000.f;// The further the player is, the higher the utility
+
+	return Utility * PatrolUtilityModifier;
+
+	//UE_LOG(LogTemp, Warning, TEXT("Patrol Utility: %f"), Utility);
 
 }
+
+float AEnemyAIController::CalculateAttackUtility() const
+{
+
+	float Utility = bIsProvoked || bInRestrictedZone ? 4.f : 0.f; 
+
+	return Utility;
+
+	//UE_LOG(LogTemp, Warning, TEXT("Attack Utility: %f"), Utility);
+	
+}
+
+float AEnemyAIController::CalculateProvokableUtility() const
+{
+	float Utility = DetectedPlayer ? 1.f : 0.f; // If the player is detected, the utility is 1, otherwise it's 0
+	return Utility;
+}
+
+void AEnemyAIController::DecideNextAction()
+{
+	EnemyActionUtility nextAction = ChooseBestAction(CalculateEnemyUtilities());
+	//UE_LOG(LogTemp, Warning, TEXT("Deciding next action: %d with utility %f"), nextAction.Action, nextAction.Utility);
+	ExecuteAction(nextAction.Action);
+}
+
+void AEnemyAIController::ExecuteAction(EAIState_Enemy Action)
+{
+	switch (Action)
+	{
+	case EAIState_Enemy::Patrol:
+		MoveToNextWaypoint();
+		break;
+	case EAIState_Enemy::Attack:
+		Attack();
+		break;
+	case EAIState_Enemy::Provokable:
+		Provoke();
+		break;
+	default:
+		UE_LOG(LogTemp, Warning, TEXT("Unhandled action in ExecuteAction"));
+		break;
+	}
+}
+
 
 void AEnemyAIController::Attack()
 {
@@ -118,15 +195,17 @@ void AEnemyAIController::Attack()
 			float DistanceToPlayer = FVector::Dist(StartLocation, EndLocation);
 			float CurrentTime = GetWorld()->GetTimeSeconds();
 
-			if (DistanceToPlayer <= AttackRange)
+			if (DistanceToPlayer <= AttackRange || bInRestrictedZone == true )
 			{
+
+				LastMovedToActor = PlayerPawn;
 				MoveToActor(PlayerPawn, AttackDistance);
 
-				if (DistanceToPlayer <= AttackDistance && CurrentTime - LastAttackTime > AttackCooldown)
+				if (DistanceToPlayer <= AttackRange && CurrentTime - LastAttackTime > AttackCooldown)
 				{
 				
 					
-					UE_LOG(LogTemp, Warning, TEXT("Attacking Player at distance: %f"), DistanceToPlayer);
+					//UE_LOG(LogTemp, Warning, TEXT("Attacking Player at distance: %f"), DistanceToPlayer);
 					// Attack the player
 					UGameplayStatics::ApplyDamage(PlayerPawn, AttackDamage, GetInstigatorController(), MyCharacter, nullptr);
 					DrawDebugLine(GetWorld(), StartLocation, EndLocation, FColor::Red, false, 1.f, 0.f, 1.f);
@@ -137,92 +216,124 @@ void AEnemyAIController::Attack()
 			}
 			else
 			{
+				bIsProvoked = false; // The player is out of range, so the enemy is no longer provoked
 
-			//UE_LOG(LogTemp, Warning, TEXT("Patrolling to waypoint index: %d"), CurrentPatrolPointIndex);
-			// Player is too far away, switch back to patrol
-			SetState(EAIState_Enemy::Patrol);
+				
 			}
 	}
 }
 
-void AEnemyAIController::Patrol()
+void AEnemyAIController::MoveToNextWaypoint()
 {
 
-	if (CurrentState != EAIState_Enemy::Patrol) // If we're not in patrol state, return
+	if (PatrolPoints.Num() > 0 && CurrentPatrolPointIndex < PatrolPoints.Num())
+	{
+		AEnemyAIController* MyCharacter = Cast<AEnemyAIController>(GetPawn());
+
+		AWaypoints* NextWaypoint = PatrolPoints[CurrentPatrolPointIndex];
+		if (NextWaypoint)
+		{
+
+			//FaceLocation(NextWaypoint->GetActorLocation());
+			//CurrentTargetLocation = NextWaypoint->GetActorLocation();
+
+			LastMovedToActor = NextWaypoint;
+			MoveToActor(NextWaypoint, 50.f, true);
+		}
+	}
+	else
+	{
+
+		UE_LOG(LogTemp, Warning, TEXT("No waypoints available or index out of bounds."));
+	}
+
+}
+
+bool AEnemyAIController::FindSuitableNewWaypointLocation(FVector& OutLocation, float MinDistance, int MaxRetries)
+{
+	AAICharacter* Guard = Cast<AAICharacter>(GetPawn());
+	UNavigationSystemV1* NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	FNavLocation RandomLocation;
+
+	for (int RetryCount = 0; RetryCount < MaxRetries; ++RetryCount) // Try to find a suitable location
+	{
+		if (NavSystem && NavSystem->GetRandomPointInNavigableRadius(Guard->GetActorLocation(), 2000.0f, RandomLocation))
+		{
+			FVector NewLocation = RandomLocation.Location;
+			if (FVector::DistSquared(NewLocation, Guard->GetActorLocation()) >= FMath::Square(MinDistance))
+			{
+				OutLocation = NewLocation;
+				return true; // Successful in finding a suitable location
+			}
+		}
+	}
+
+	return false; // Failed to find a suitable location
+}
+
+void AEnemyAIController::SpawnNewWaypoint()
+{
+	if (CurrentState != EAIState_Enemy::Patrol)
 	{
 		return;
 	}
-	
 
-	ACharacter* MyCharacter = Cast<ACharacter>(GetPawn());
-	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
+	FVector NewLocation;
+	const float MinDistance = 500.f; // Minimum distance from the current waypoint
+	const int MaxRetries = 10; // Maximum number of attempts to find a suitable location
 
-	if (PatrolPoints.Num() > 0 && MyCharacter)
+	if (FindSuitableNewWaypointLocation(NewLocation, MinDistance, MaxRetries))
 	{
-
-		// Check if the AI is close to the current waypoint
-		float DistanceSquared = FVector::DistSquared(PatrolPoints[CurrentPatrolPointIndex]->GetActorLocation(), MyCharacter->GetActorLocation());
-		if (DistanceSquared < 100.f * 100.f)
+		// Destroy the current waypoint before spawning a new one
+		if (PatrolPoints.IsValidIndex(CurrentPatrolPointIndex))
 		{
-			// Destroy the current waypoint
-			PatrolPoints[CurrentPatrolPointIndex]->Destroy();
-			//UE_LOG(LogTemp, Warning, TEXT("Destroyed Waypoint at: %s"), *PatrolPoints[CurrentPatrolPointIndex]->GetActorLocation().ToString());
-
-			// Spawn a new waypoint
-			FNavLocation RandomLocation;
-			UNavigationSystemV1* NavSystem = UNavigationSystemV1::GetNavigationSystem(GetWorld());
-			if (NavSystem && NavSystem->GetRandomReachablePointInRadius(MyCharacter->GetActorLocation(), 1000.f, RandomLocation))
+			AWaypoints* CurrentWaypoint = PatrolPoints[CurrentPatrolPointIndex];
+			if (CurrentWaypoint)
 			{
-				AWaypoints* NewWaypoint = GetWorld()->SpawnActor<AWaypoints>(AWaypoints::StaticClass(), RandomLocation.Location, FRotator::ZeroRotator);
-				if (NewWaypoint)
-				{
-					PatrolPoints[CurrentPatrolPointIndex] = NewWaypoint;
-
-					// Display debug sphere for the new waypoint if the AI is currently following a path
-					if (CurrentState == EAIState_Enemy::Patrol)
-					{
-						DrawDebugSphere(GetWorld(), RandomLocation.Location, 50.0f, 12, FColor::Green, false, 2.0f);
-					}
-
-					//UE_LOG(LogTemp, Warning, TEXT("Generated New Waypoint at: %s"), *RandomLocation.Location.ToString());
-				}
+				CurrentWaypoint->Destroy();
+				PatrolPoints.RemoveAt(CurrentPatrolPointIndex);
 			}
-
-			// Update to the next waypoint
-			CurrentPatrolPointIndex = (CurrentPatrolPointIndex + 1) % PatrolPoints.Num();
-			//UE_LOG(LogTemp, Warning, TEXT("MoveToNextWaypoint called!"));
 		}
 
-		// Move to the nearest waypoint
-		UAIBlueprintHelperLibrary::SimpleMoveToLocation(this, PatrolPoints[CurrentPatrolPointIndex]->GetActorLocation());
+		// Spawn the new waypoint
+		AWaypoints* NewWaypoint = GetWorld()->SpawnActor<AWaypoints>(AWaypoints::StaticClass(), NewLocation, FRotator::ZeroRotator);
+		if (NewWaypoint)
+		{
+			PatrolPoints.Add(NewWaypoint);
+			CurrentPatrolPointIndex = PatrolPoints.Num() - 1; // Move to the newly spawned waypoint next
 
+
+			DrawDebugSphere(GetWorld(), NewLocation, 50.f, 12, FColor::Green, false, 3.f);
+			//UE_LOG(LogTemp, Warning, TEXT("New waypoint spawned at: %s"), *NewLocation.ToString());
+		}
 	}
-
-
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to find a suitable location for a new waypoint after %d retries."), MaxRetries);
+	}
 }
-
 void AEnemyAIController::OnTargetDetected(AActor* Actor, FAIStimulus Stimulus)
 {
 
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
 	float DistanceToPlayer = FVector::Dist(GetPawn()->GetActorLocation(), PlayerPawn->GetActorLocation());
 
-	if (Stimulus.WasSuccessfullySensed() && Actor == PlayerPawn) // Check for sight/sound stimulus
+	if (Stimulus.WasSuccessfullySensed() && Actor == PlayerPawn) // Check for sight stimulus
 	{
-		SetState(EAIState_Enemy::Provokable);
+		CalculateProvokableUtility();
 		DetectedPlayer = Actor;
 		FacePlayer();
 		UE_LOG(LogTemp, Warning, TEXT("Detected Actor: %s, at Location: %s"), *Actor->GetName(), *Actor->GetActorLocation().ToString());
 	}
 	else if (DistanceToPlayer <= AttackRange) // Additional check for distance
 	{
-		SetState(EAIState_Enemy::Provokable);
+		CalculateProvokableUtility();
 		DetectedPlayer = PlayerPawn; 
 		FacePlayer();
 	}
 	else
 	{
-		SetState(EAIState_Enemy::Patrol);
+		CalculatePatrolUtility();
 		DetectedPlayer = nullptr;
 		UE_LOG(LogTemp, Warning, TEXT("Lost Actor: %s"), *Actor->GetName());
 	}
@@ -231,11 +342,6 @@ void AEnemyAIController::OnTargetDetected(AActor* Actor, FAIStimulus Stimulus)
 
 void AEnemyAIController::PopulateWaypointsInLevel()
 {
-
-	if (CurrentState != EAIState_Enemy::Patrol) // If we're not in patrol state, return
-	{
-		return;
-	}
 
 	ACharacter* MyCharacter = Cast<ACharacter>(GetPawn());
 
@@ -265,14 +371,14 @@ void AEnemyAIController::FacePlayer()
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
 
 
-	FVector PlayerDirection = PlayerPawn->GetActorLocation() - MyCharacter->GetActorLocation();
-	PlayerDirection.Normalize();
-
-	FRotator NewRotation = PlayerDirection.Rotation();
-	MyCharacter->SetActorRotation(FMath::RInterpTo(MyCharacter->GetActorRotation(), NewRotation, GetWorld()->GetDeltaSeconds(), 5.0f));
+	FVector Direction = (PlayerPawn->GetActorLocation() - MyCharacter->GetActorLocation()).GetSafeNormal();
+	FRotator TargetRotation = FRotationMatrix::MakeFromX(Direction).Rotator();
+	TargetRotation.Pitch = 0.0f;
+	TargetRotation.Roll = 0.0f;
+	MyCharacter->SetActorRotation(TargetRotation);
 }
 
-void AEnemyAIController::Provoke(float DeltaTime)
+void AEnemyAIController::Provoke()
 {
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
 	StopMovement();
@@ -284,21 +390,56 @@ void AEnemyAIController::Provoke(float DeltaTime)
 		if (DistanceToPlayer <= ProvokableDistance)
 		{
 			FacePlayer();
-			PlayerProximityTime += DeltaTime;
-			DrawDebugString(GetWorld(), FVector(0, 0, 100), FString::Printf(TEXT("Player Proximity Time: %f"), PlayerProximityTime), GetPawn(), FColor::Red, 0.0f, true);
 
-			// If the player has been within provocation distance for longer than the threshold, provoke the AI
-			if (PlayerProximityTime >= ProvokableTime)
+
+			if (!bIsProvoked)
 			{
-				//DrawDebugString(GetWorld(), FVector(0, 200, 100), FString::Printf(TEXT("Provoked!")), GetPawn(), FColor::Red, 3.0f, true);
-				SetState(EAIState_Enemy::Attack);
+				FTimerHandle PlayerProximity;
+				GetWorld()->GetTimerManager().SetTimer(PlayerProximity, this, &AEnemyAIController::SetProvoked, 5.0f, false);
 			}
+
 		}
 		else
 		{
-			// Reset proximity time if the player is outside the provocation distance
-			PlayerProximityTime = 0;
-			SetState(EAIState_Enemy::Patrol);
+			bIsProvoked = false;
 		}
+
+
 	}
+}
+
+void AEnemyAIController::SetProvoked()
+{
+		
+
+		bIsProvoked = true;
+
+}
+
+void AEnemyAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
+{
+	Super::OnMoveCompleted(RequestID, Result);
+
+	if (Result.IsSuccess() && CurrentState == EAIState_Enemy::Patrol)
+	{
+
+		AWaypoints*Waypoint = Cast<AWaypoints>(LastMovedToActor); 
+
+		if (Waypoint)
+		{
+			SpawnNewWaypoint();
+		}
+		
+		FTimerHandle TimerHandle;
+		GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &AEnemyAIController::DecideNextAction, 1.f, false);
+
+		//UE_LOG(LogTemp, Warning, TEXT("Move Completed"));
+		//DecideNextAction();
+
+	}
+}
+
+void AEnemyAIController::SetInRestrictedZone(bool bRestricted)
+{
+	bInRestrictedZone = bRestricted;
 }

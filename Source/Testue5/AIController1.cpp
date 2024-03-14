@@ -178,7 +178,7 @@ void AAIController1::SpawnNewWaypoint()
 
 	
 			DrawDebugSphere(GetWorld(), NewLocation, 50.f, 12, FColor::Green, false, 3.f);
-			UE_LOG(LogTemp, Warning, TEXT("New waypoint spawned at: %s"), *NewLocation.ToString());
+			//UE_LOG(LogTemp, Warning, TEXT("New waypoint spawned at: %s"), *NewLocation.ToString());
 		}
 	}
 	else
@@ -392,7 +392,8 @@ void AAIController1::InitialiseLocations() {
 	}
 }
 
-TArray<CivillianActionUtility> AAIController1::CalculateCurrentUtilities() {
+TArray<CivillianActionUtility> AAIController1::CalculateCurrentUtilities() 
+{
 	TArray<CivillianActionUtility> actionUtilities;
 
 	// Calculate the utility of each action

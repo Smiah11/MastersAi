@@ -52,8 +52,54 @@ ATestue5Character::ATestue5Character()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
+
+	GetCapsuleComponent()->OnComponentBeginOverlap.AddDynamic(this, &ATestue5Character::OnOverlapBegin);
+
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+}
+
+void ATestue5Character::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+
+	if (OtherActor && OtherActor != this && OtherComp && OtherActor->ActorHasTag("Restricted"))
+	{
+		TArray<AActor*>FoundGuards;// Create an array to store the guards
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AEnemyAIController::StaticClass(), FoundGuards);// Get all the guards in the level
+
+		for (AActor* Guard : FoundGuards) 
+		{
+			AEnemyAIController* GuardController = Cast<AEnemyAIController>(Guard);
+			if (GuardController)
+			{
+				GuardController->SetInRestrictedZone(true);
+				GuardController->GetCharacter()->GetCharacterMovement()->MaxWalkSpeed = 700.f;
+				UE_LOG(LogTemp, Warning, TEXT("Guard has been Notified"));
+			}
+		}
+
+	}
+}
+
+void ATestue5Character::OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int OterBodyIndex)
+{
+	if (OtherActor && OtherActor != this && OtherComp && OtherActor->ActorHasTag("Restricted"))
+	{
+		TArray<AActor*>FoundGuards;// Create an array to store the guards
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AEnemyAIController::StaticClass(), FoundGuards);// Get all the guards in the level
+
+		for (AActor* Guard : FoundGuards)
+		{
+			AEnemyAIController* GuardController = Cast<AEnemyAIController>(Guard);
+			if (GuardController)
+			{
+				GuardController->SetInRestrictedZone(false);
+				GuardController->GetCharacter()->GetCharacterMovement()->MaxWalkSpeed = 350.f;
+				UE_LOG(LogTemp, Warning, TEXT("Guards no longer notified"));
+			}
+		}
+
+	}
 }
 
 void ATestue5Character::BeginPlay()

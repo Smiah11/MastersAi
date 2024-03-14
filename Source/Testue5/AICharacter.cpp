@@ -56,7 +56,7 @@ float AAICharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEve
     if (EnemyAIController)
     {
         // If the controller is the specific type and the character took damage, change its state
-        EnemyAIController->SetState(EAIState_Enemy::Attack);
+        EnemyAIController->SetProvoked();
     }
 
     return ActualDamage;
