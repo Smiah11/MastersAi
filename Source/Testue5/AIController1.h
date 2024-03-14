@@ -53,10 +53,6 @@ public:
 
 	void ReactToPlayer();
 
-	void FacePlayer();
-
-	void StopFacingPlayer();
-
 	void FaceLocation(const FVector& Location);
 
 	//void AvoidOtherAI();
@@ -113,6 +109,7 @@ private:
 	//void Wait();
 
 	bool bIsWaiting;
+
 	
 	float MinDistanceBetweenPoints = 300.f;
 
@@ -132,6 +129,7 @@ private:
 	FVector WorkLocation;
 	FVector HomeLocation;
 	FVector ShoppingLocation;
+	FVector CurrentTargetLocation;// Keeps track of the current location the AI is moving to
 
 
 	

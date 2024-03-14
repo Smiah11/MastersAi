@@ -21,8 +21,8 @@ AAICharacter::AAICharacter()
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 
 
-    HungerLevel = 0.f; // starts not hungry
-    TirednessLevel = 0.f; // starts not tired
+    HungerLevel = FMath::RandRange(0.f, 75.f);
+    TirednessLevel = FMath::RandRange(0.f, 75.f);
 
     
     HungerIncreaseRate = 1.f;
@@ -96,8 +96,12 @@ void AAICharacter::Tick(float DeltaTime)
     TirednessLevel+= TirednessIncreaseRate * DeltaTime;
 
     //clamp values
-    HungerLevel = FMath::Clamp(HungerLevel, 0.f, 100.f);
+    HungerLevel = FMath::Clamp(HungerLevel, 0.f, 100.f); 
     TirednessLevel = FMath::Clamp(TirednessLevel, 0.f, 100.f);
+
+
+  //  UE_LOG(LogTemp, Warning, TEXT("Hunger iNCREASE RATE: %f"), HungerIncreaseRate);
+ //   UE_LOG(LogTemp, Warning, TEXT("Tiredness iNCREASE RATE: %f"), TirednessIncreaseRate);
 	
 
 }
@@ -127,6 +131,7 @@ void AAICharacter::IncreaseTiredness(float Amount)
 void AAICharacter::DecreaseHunger(float Amount)
 {
     	HungerLevel -= Amount;
+        HungerLevel = FMath::Clamp(HungerLevel, 0.f, 100.f);
     
 
 }
@@ -134,6 +139,7 @@ void AAICharacter::DecreaseHunger(float Amount)
 void AAICharacter::DecreaseTiredness(float Amount)
 {
 	TirednessLevel -= Amount;
+    TirednessLevel = FMath::Clamp(TirednessLevel, 0.f, 100.f);
 }
 
 float AAICharacter::GetHungerIncreaseRate() const
