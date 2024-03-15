@@ -53,13 +53,16 @@ ATestue5Character::ATestue5Character()
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
 
-	GetCapsuleComponent()->OnComponentBeginOverlap.AddDynamic(this, &ATestue5Character::OnOverlapBegin);
+	GetCapsuleComponent()->OnComponentBeginOverlap.AddDynamic(this, &ATestue5Character::OnOverlapBegin); // Set up a notification for when this component overlaps something
+	// Unreal Engine has a bug where this function is not called when the overlap ends, so I had to use the OnActorEndOverlap function instead (still didnt work)
+	//GetCapsuleComponent()->OnComponentEndOverlap.AddDynamic(this, &ATestue5Character::OnOverlapEnd); 
+	//OnActorEndOverlap.AddDynamic(this, &ATestue5Character::OnActorOverlapEnd);
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
 
-void ATestue5Character::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+void ATestue5Character::OnOverlapBegin(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 
 	if (OtherActor && OtherActor != this && OtherComp && OtherActor->ActorHasTag("Restricted"))
@@ -72,8 +75,10 @@ void ATestue5Character::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AAct
 			AEnemyAIController* GuardController = Cast<AEnemyAIController>(Guard);
 			if (GuardController)
 			{
-				GuardController->SetInRestrictedZone(true);
-				GuardController->GetCharacter()->GetCharacterMovement()->MaxWalkSpeed = 700.f;
+
+				FVector LastKnowLocation = GetActorLocation();
+				GuardController->SetInRestrictedZone(true, LastKnowLocation);
+				//GuardController->GetCharacter()->GetCharacterMovement()->MaxWalkSpeed = 700.f;
 				UE_LOG(LogTemp, Warning, TEXT("Guard has been Notified"));
 			}
 		}
@@ -81,26 +86,6 @@ void ATestue5Character::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AAct
 	}
 }
 
-void ATestue5Character::OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int OterBodyIndex)
-{
-	if (OtherActor && OtherActor != this && OtherComp && OtherActor->ActorHasTag("Restricted"))
-	{
-		TArray<AActor*>FoundGuards;// Create an array to store the guards
-		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AEnemyAIController::StaticClass(), FoundGuards);// Get all the guards in the level
-
-		for (AActor* Guard : FoundGuards)
-		{
-			AEnemyAIController* GuardController = Cast<AEnemyAIController>(Guard);
-			if (GuardController)
-			{
-				GuardController->SetInRestrictedZone(false);
-				GuardController->GetCharacter()->GetCharacterMovement()->MaxWalkSpeed = 350.f;
-				UE_LOG(LogTemp, Warning, TEXT("Guards no longer notified"));
-			}
-		}
-
-	}
-}
 
 void ATestue5Character::BeginPlay()
 {

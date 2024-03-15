@@ -4,6 +4,8 @@
 #include "AICharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include <EnemyAIController.h>
+#include "AIController1.h"
+#include <Kismet/GameplayStatics.h>
 
 // Sets default values
 AAICharacter::AAICharacter()
@@ -49,14 +51,31 @@ float AAICharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEve
 {
     float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
-
-
-    // Check if the controller is of the specific AI controller class you're interested in
-    AEnemyAIController* EnemyAIController = Cast<AEnemyAIController>(GetController());
-    if (EnemyAIController)
+    AEnemyAIController* GuardController = Cast<AEnemyAIController>(GetController());
+    if (GuardController)
     {
-        // If the controller is the specific type and the character took damage, change its state
-        EnemyAIController->SetProvoked();
+        // This AI is a guard. Set the guard to attack the player immediately.
+        GuardController->SetProvoked();
+    }
+    else
+    {
+        // Check if this AI is a civilian by trying to cast to a civilian controller class
+        AAIController1* CivilianController = Cast<AAIController1>(GetController());
+        if (CivilianController)
+        {
+            // This AI is a civilian. Notify nearby guards to investigate the last known location of the player.
+            FVector LastKnownLocation = GetActorLocation(); // Assuming the last known location is the location of the civilian when damaged
+            TArray<AActor*> Guards;
+            UGameplayStatics::GetAllActorsOfClass(GetWorld(), AEnemyAIController::StaticClass(), Guards);
+            for (AActor* Guard : Guards)
+            {
+                AEnemyAIController* GuardAIController = Cast<AEnemyAIController>(Guard);
+                if (GuardAIController)
+                {
+                    GuardAIController->SetInRestrictedZone(true, LastKnownLocation);
+                }
+            }
+        }
     }
 
     return ActualDamage;

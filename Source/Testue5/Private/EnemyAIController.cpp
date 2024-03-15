@@ -23,11 +23,11 @@ AEnemyAIController::AEnemyAIController()
 	
 
 	//Initialise Perception Components
-	SetPerceptionComponent(*CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("Perception Component")));
-	SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("Sight Config"));
-	GetPerceptionComponent()->SetDominantSense(*SightConfig->GetSenseImplementation());
-	GetPerceptionComponent()->OnTargetPerceptionUpdated.AddDynamic(this, &AEnemyAIController::OnTargetDetected);
-	GetPerceptionComponent()->ConfigureSense(*SightConfig);
+	//SetPerceptionComponent(*CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("Perception Component")));
+	//SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("Sight Config"));
+	//GetPerceptionComponent()->SetDominantSense(*SightConfig->GetSenseImplementation());
+	//GetPerceptionComponent()->OnTargetPerceptionUpdated.AddDynamic(this, &AEnemyAIController::OnTargetDetected);
+	//GetPerceptionComponent()->ConfigureSense(*SightConfig);
 
 	PrimaryActorTick.TickInterval = 0.1f;
 
@@ -52,6 +52,7 @@ void AEnemyAIController::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	DecideNextAction();
+	CheckPlayerProximity();
 
 
 }
@@ -66,6 +67,7 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 
 void AEnemyAIController::SetupAI()
 {
+	/*
 	// Setup AI perception
 	SightConfig->SightRadius = 1000.f;
 	SightConfig->LoseSightRadius = SightConfig->SightRadius + 50.f;
@@ -76,7 +78,7 @@ void AEnemyAIController::SetupAI()
 	SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
 
 	GetPerceptionComponent()->ConfigureSense(*SightConfig);
-
+	*/
 
 	ACharacter* MyCharacter = Cast<ACharacter>(GetPawn());
 	if (MyCharacter && PatrolPoints.Num() > 0)
@@ -100,6 +102,7 @@ TArray<EnemyActionUtility> AEnemyAIController::CalculateEnemyUtilities()
 	EnemyUtilities.Add({ EAIState_Enemy::Patrol, CalculatePatrolUtility() });
 	EnemyUtilities.Add({ EAIState_Enemy::Attack, CalculateAttackUtility() });
 	EnemyUtilities.Add({ EAIState_Enemy::Provokable, CalculateProvokableUtility() });
+	EnemyUtilities.Add({ EAIState_Enemy::Investigate, CalculateInvestigateUtility() });
 
 	return EnemyUtilities;
 }
@@ -126,7 +129,7 @@ float AEnemyAIController::CalculatePatrolUtility() const
 
 	float Utility = DistanceToPlayer / 1000.f;// The further the player is, the higher the utility
 
-	return Utility * PatrolUtilityModifier;
+	return Utility; //* PatrolUtilityModifier;
 
 	//UE_LOG(LogTemp, Warning, TEXT("Patrol Utility: %f"), Utility);
 
@@ -135,7 +138,7 @@ float AEnemyAIController::CalculatePatrolUtility() const
 float AEnemyAIController::CalculateAttackUtility() const
 {
 
-	float Utility = bIsProvoked || bInRestrictedZone ? 4.f : 0.f; 
+	float Utility = bIsProvoked  ? 4.f : 0.f;  // if the player is provoked or in a restricted zone
 
 	return Utility;
 
@@ -149,10 +152,22 @@ float AEnemyAIController::CalculateProvokableUtility() const
 	return Utility;
 }
 
+float AEnemyAIController::CalculateInvestigateUtility() const
+{
+	const float DistanceToLastKnowLocation = FVector::Dist(LastKnownLocation, GetPawn()->GetActorLocation());
+	float MaxInvestigationDistance = 3000.f;
+	const float Utility = bInRestrictedZone ? 3.f : 0.f;
+		
+	//FMath::Clamp(1.f - (DistanceToLastKnowLocation / MaxInvestigationDistance), 0.f, 1.f) && ; // The closer the enemy is to the last known location, the higher the utility
+
+	return Utility;
+
+}
+
 void AEnemyAIController::DecideNextAction()
 {
 	EnemyActionUtility nextAction = ChooseBestAction(CalculateEnemyUtilities());
-	//UE_LOG(LogTemp, Warning, TEXT("Deciding next action: %d with utility %f"), nextAction.Action, nextAction.Utility);
+	UE_LOG(LogTemp, Warning, TEXT("Deciding next action: %d with utility %f"), nextAction.Action, nextAction.Utility);
 	ExecuteAction(nextAction.Action);
 }
 
@@ -169,6 +184,9 @@ void AEnemyAIController::ExecuteAction(EAIState_Enemy Action)
 	case EAIState_Enemy::Provokable:
 		Provoke();
 		break;
+	case EAIState_Enemy::Investigate:
+		Investigate();
+		break;
 	default:
 		UE_LOG(LogTemp, Warning, TEXT("Unhandled action in ExecuteAction"));
 		break;
@@ -184,9 +202,11 @@ void AEnemyAIController::Attack()
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
 	ACharacter* MyCharacter = Cast<ACharacter>(GetPawn());
 
+
+
 	if (PlayerPawn && MyCharacter)
 	{
-
+		
 		FVector StartLocation = MyCharacter->GetActorLocation();
 		FVector EndLocation = PlayerPawn->GetActorLocation();
 		//FHitResult HitResult;
@@ -195,30 +215,26 @@ void AEnemyAIController::Attack()
 			float DistanceToPlayer = FVector::Dist(StartLocation, EndLocation);
 			float CurrentTime = GetWorld()->GetTimeSeconds();
 
-			if (DistanceToPlayer <= AttackRange || bInRestrictedZone == true )
+			if (DistanceToPlayer <= AttackRange  )
 			{
 
 				LastMovedToActor = PlayerPawn;
-				MoveToActor(PlayerPawn, AttackDistance);
+				MoveToActor(PlayerPawn, AttackDistance, true); 
 
-				if (DistanceToPlayer <= AttackRange && CurrentTime - LastAttackTime > AttackCooldown)
+				if (CurrentTime - LastAttackTime > AttackCooldown)
 				{
 				
 					
 					//UE_LOG(LogTemp, Warning, TEXT("Attacking Player at distance: %f"), DistanceToPlayer);
-					// Attack the player
+					// Attack the player 
+
+					// Simple Line Trace 
 					UGameplayStatics::ApplyDamage(PlayerPawn, AttackDamage, GetInstigatorController(), MyCharacter, nullptr);
 					DrawDebugLine(GetWorld(), StartLocation, EndLocation, FColor::Red, false, 1.f, 0.f, 1.f);
 
 					LastAttackTime = CurrentTime; // Update the last attack time
 					
 				}
-			}
-			else
-			{
-				bIsProvoked = false; // The player is out of range, so the enemy is no longer provoked
-
-				
 			}
 	}
 }
@@ -312,31 +328,45 @@ void AEnemyAIController::SpawnNewWaypoint()
 		UE_LOG(LogTemp, Error, TEXT("Failed to find a suitable location for a new waypoint after %d retries."), MaxRetries);
 	}
 }
-void AEnemyAIController::OnTargetDetected(AActor* Actor, FAIStimulus Stimulus)
+
+void AEnemyAIController::CheckPlayerProximity()
 {
-
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
-	float DistanceToPlayer = FVector::Dist(GetPawn()->GetActorLocation(), PlayerPawn->GetActorLocation());
+	if (!PlayerPawn) return;
 
-	if (Stimulus.WasSuccessfullySensed() && Actor == PlayerPawn) // Check for sight stimulus
+	float DistanceToPlayer = FVector::Dist(PlayerPawn->GetActorLocation(), GetPawn()->GetActorLocation());
+	if (DistanceToPlayer <= ProvokableDistance)
 	{
-		CalculateProvokableUtility();
-		DetectedPlayer = Actor;
-		FacePlayer();
-		UE_LOG(LogTemp, Warning, TEXT("Detected Actor: %s, at Location: %s"), *Actor->GetName(), *Actor->GetActorLocation().ToString());
-	}
-	else if (DistanceToPlayer <= AttackRange) // Additional check for distance
-	{
-		CalculateProvokableUtility();
-		DetectedPlayer = PlayerPawn; 
-		FacePlayer();
+		DetectedPlayer = PlayerPawn;
+		UE_LOG(LogTemp, Warning, TEXT("Player Detected"));
 	}
 	else
 	{
-		CalculatePatrolUtility();
 		DetectedPlayer = nullptr;
-		UE_LOG(LogTemp, Warning, TEXT("Lost Actor: %s"), *Actor->GetName());
+		bIsProvoked = false;
+		UE_LOG(LogTemp, Warning, TEXT("Player is too far or not detected"));
 	}
+
+	/*
+	if (Stimulus.WasSuccessfullySensed() && Actor == PlayerPawn) {
+		DetectedPlayer = Actor;
+		FacePlayer();
+		if (DistanceToPlayer <= ProvokableDistance) {
+			bIsProvoked = true;
+			UE_LOG(LogTemp, Warning, TEXT("Player detected and provoked."));
+		}
+		else {
+			bIsProvoked = false; // Clear provoked state if player is seen but out of provoke distance
+		}
+	}
+	else {
+		DetectedPlayer = nullptr;
+		bIsProvoked = false; // Player lost, clear provoked state
+		UE_LOG(LogTemp, Warning, TEXT("Lost sight of Actor: %s"), *Actor->GetName());
+	}
+	*/
+
+
 
 }
 
@@ -381,7 +411,7 @@ void AEnemyAIController::FacePlayer()
 void AEnemyAIController::Provoke()
 {
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
-	StopMovement();
+	
 	if (PlayerPawn)
 	{
 		float DistanceToPlayer = FVector::Dist(GetPawn()->GetActorLocation(), PlayerPawn->GetActorLocation());
@@ -390,13 +420,13 @@ void AEnemyAIController::Provoke()
 		if (DistanceToPlayer <= ProvokableDistance)
 		{
 			FacePlayer();
+			StopMovement();
 
 
-			if (!bIsProvoked)
-			{
-				FTimerHandle PlayerProximity;
-				GetWorld()->GetTimerManager().SetTimer(PlayerProximity, this, &AEnemyAIController::SetProvoked, 5.0f, false);
-			}
+	
+			FTimerHandle PlayerProximity;
+			GetWorld()->GetTimerManager().SetTimer(PlayerProximity, this, &AEnemyAIController::SetProvoked, 5.0f, false);
+			
 
 		}
 		else
@@ -408,12 +438,35 @@ void AEnemyAIController::Provoke()
 	}
 }
 
+void AEnemyAIController::Investigate()
+{
+		MoveToLocation(LastKnownLocation);
+
+		APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
+
+		FVector PlayerLocation = PlayerPawn->GetActorLocation();
+		float DistanceToLocation = FVector::Dist(GetPawn()->GetActorLocation(),LastKnownLocation);
+		
+		if (DistanceToLocation <= ProvokableDistance)
+		{
+			ResetInvestigation();
+		}
+
+	/// maybe if player is not in  provokable distance then set in restricted zone to false
+
+}
+
+void AEnemyAIController::ResetInvestigation()
+{
+	LastKnownLocation = FVector::ZeroVector;
+	bInRestrictedZone = false;
+	DecideNextAction();
+}
+
 void AEnemyAIController::SetProvoked()
 {
-		
 
 		bIsProvoked = true;
-
 }
 
 void AEnemyAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
@@ -437,9 +490,21 @@ void AEnemyAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFoll
 		//DecideNextAction();
 
 	}
+	else if (Result.IsSuccess() && CurrentState == EAIState_Enemy::Investigate)
+	{
+		bInRestrictedZone = false;
+		FTimerHandle TimerHandle;
+		GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &AEnemyAIController::DecideNextAction, 1.f, false);
+	}
 }
 
-void AEnemyAIController::SetInRestrictedZone(bool bRestricted)
+void AEnemyAIController::SetInRestrictedZone(bool bRestricted, FVector LastKnownPlayerLocation)
 {
 	bInRestrictedZone = bRestricted;
+
+	if (bRestricted && LastKnownLocation.IsNearlyZero()) 
+	{
+		LastKnownLocation = LastKnownPlayerLocation;
+	}
+
 }

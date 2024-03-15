@@ -17,7 +17,8 @@ enum class EAIState_Enemy : uint8
 {
 	Patrol,
 	Attack,
-	Provokable
+	Provokable,
+	Investigate
 };
 
 struct EnemyActionUtility
@@ -51,6 +52,7 @@ public:
 	float CalculatePatrolUtility() const;
 	float CalculateAttackUtility() const;
 	float CalculateProvokableUtility() const;
+	float CalculateInvestigateUtility() const;
 
 	void DecideNextAction();
 
@@ -59,7 +61,7 @@ public:
 
 	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
 
-	void SetInRestrictedZone(bool bRestricted);
+	void SetInRestrictedZone(bool bRestricted, FVector LastKnownPlayerLocation);
 
 	bool bInRestrictedZone;
 
@@ -73,8 +75,7 @@ protected:
 
 	void SpawnNewWaypoint();
 
-	UFUNCTION()
-	void OnTargetDetected(AActor* Actor, FAIStimulus Stimilus);
+	void CheckPlayerProximity();
 
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
@@ -90,16 +91,18 @@ private:
 	float AttackDistance = 250.f;
 	float LastAttackTime; 
 	const float AttackCooldown = 2.0f; 
-	float ProvokableDistance = 500.f;
+	float ProvokableDistance = 400.f;
 	float ProvokableTime = 5.f;
 	float PlayerProximityTime = 0.f;
 
 	AActor* LastMovedToActor = nullptr; // Last actor moved to
 
+	FVector LastKnownLocation;
+
 
 	//Utility Modifiers
 
-	float PatrolUtilityModifier = 1.5f;
+	float PatrolUtilityModifier = .5f;
 	float AttackUtilityModifier = 1.f;
 	float ProvokableUtilityModifier = 3.f;
 
@@ -107,7 +110,8 @@ private:
 	float LastProvokedTime = 0;
 
 	bool bIsProvoked;
-
+	bool bIsInProvokableDistance;
+	bool bIsPlayerVisible;
 
 
 	
@@ -117,6 +121,8 @@ private:
 	void PopulateWaypointsInLevel();
 	void FacePlayer();
 	void Provoke();
+	void Investigate();
+	void ResetInvestigation();
 
 
 
