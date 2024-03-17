@@ -33,6 +33,9 @@ public:
 
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+	UMaterial* GuardMaterial;
+
 	void Move();
 
 	// Called every frame
@@ -55,6 +58,8 @@ public:
 
 	void SetHungerIncreaseRate(float NewRate);
 	void SetTirednessIncreaseRate(float NewRate);
+
+	void SetGuardMaterial();
 
 private:
 

@@ -43,6 +43,15 @@ void AAICharacter::BeginPlay()
     LastHungerUpdateTime = GetWorld()->GetTimeSeconds();
     LastTirednessUpdateTime = GetWorld()->GetTimeSeconds();
 
+
+    AEnemyAIController* GuardController = Cast<AEnemyAIController>(GetController());
+
+    if (GuardController) // if the AI is  A GUARD SET THE MATERIAL
+    {
+		SetGuardMaterial();
+	}
+
+
     Move();
 	
 }
@@ -179,6 +188,24 @@ void AAICharacter::SetHungerIncreaseRate(float NewRate)
 void AAICharacter::SetTirednessIncreaseRate(float NewRate)
 {
     	TirednessIncreaseRate = NewRate;
+}
+
+void AAICharacter::SetGuardMaterial()
+{
+
+    if (GuardMaterial)
+    {
+        GetMesh()->SetMaterial(0, GuardMaterial);
+        UE_LOG(LogTemp, Warning, TEXT("GUARD MATERIAL SET"));
+
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("GUARD MATERIAL is null"));
+    }
+
+
+
 }
 
 // Called to bind functionality to input

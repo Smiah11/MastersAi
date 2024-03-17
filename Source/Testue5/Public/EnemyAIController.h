@@ -123,6 +123,7 @@ private:
 	void Provoke();
 	void Investigate();
 	void ResetInvestigation();
+	float SetMaxSpeed(float Speed);
 
 
 

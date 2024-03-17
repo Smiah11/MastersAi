@@ -34,6 +34,10 @@ AEnemyAIController::AEnemyAIController()
 	bIsProvoked = false;
 
 	bInRestrictedZone = false;
+
+	AAICharacter* AICharacter = Cast<AAICharacter>(GetPawn());
+
+
 	
 }
 
@@ -80,11 +84,14 @@ void AEnemyAIController::SetupAI()
 	GetPerceptionComponent()->ConfigureSense(*SightConfig);
 	*/
 
-	ACharacter* MyCharacter = Cast<ACharacter>(GetPawn());
-	if (MyCharacter && PatrolPoints.Num() > 0)
-	{
-		UCharacterMovementComponent* MovementComponent = MyCharacter->GetCharacterMovement();
+	SetMaxSpeed(350.f);
 
+	AAICharacter* AICharacter = Cast<AAICharacter>(GetPawn());
+	if (AICharacter && PatrolPoints.Num() > 0)
+	{
+		UCharacterMovementComponent* MovementComponent = AICharacter->GetCharacterMovement();
+
+	
 		if (MovementComponent)
 		{
 			// Set ground speed
@@ -176,10 +183,12 @@ void AEnemyAIController::ExecuteAction(EAIState_Enemy Action)
 	switch (Action)
 	{
 	case EAIState_Enemy::Patrol:
+		SetMaxSpeed(350.f);
 		MoveToNextWaypoint();
 		break;
 	case EAIState_Enemy::Attack:
 		Attack();
+		SetMaxSpeed(700.f);
 		break;
 	case EAIState_Enemy::Provokable:
 		Provoke();
@@ -440,7 +449,11 @@ void AEnemyAIController::Provoke()
 
 void AEnemyAIController::Investigate()
 {
+		SetMaxSpeed(700.f);
+
 		MoveToLocation(LastKnownLocation);
+
+
 
 		APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
 
@@ -460,8 +473,29 @@ void AEnemyAIController::ResetInvestigation()
 {
 	LastKnownLocation = FVector::ZeroVector;
 	bInRestrictedZone = false;
+	SetMaxSpeed(350.f);
 	DecideNextAction();
 }
+
+float AEnemyAIController::SetMaxSpeed(float Speed)
+{
+
+	ACharacter* ControllerAI = GetCharacter();
+
+	if (ControllerAI)
+	{
+		UCharacterMovementComponent* AIMovementComp = ControllerAI->GetCharacterMovement();
+
+		if (AIMovementComp)
+		{
+			AIMovementComp->MaxWalkSpeed = Speed;
+		}
+	}
+
+	return Speed;
+}
+
+
 
 void AEnemyAIController::SetProvoked()
 {
