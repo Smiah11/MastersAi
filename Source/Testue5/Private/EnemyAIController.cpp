@@ -136,7 +136,7 @@ float AEnemyAIController::CalculatePatrolUtility() const
 
 	float Utility = DistanceToPlayer / 1000.f;// The further the player is, the higher the utility
 
-	return Utility; //* PatrolUtilityModifier;
+	return Utility * PatrolUtilityModifier;
 
 	//UE_LOG(LogTemp, Warning, TEXT("Patrol Utility: %f"), Utility);
 
@@ -174,7 +174,7 @@ float AEnemyAIController::CalculateInvestigateUtility() const
 void AEnemyAIController::DecideNextAction()
 {
 	EnemyActionUtility nextAction = ChooseBestAction(CalculateEnemyUtilities());
-	UE_LOG(LogTemp, Warning, TEXT("Deciding next action: %d with utility %f"), nextAction.Action, nextAction.Utility);
+	//UE_LOG(LogTemp, Warning, TEXT("Deciding next action: %d with utility %f"), nextAction.Action, nextAction.Utility);
 	ExecuteAction(nextAction.Action);
 }
 
@@ -453,6 +453,8 @@ void AEnemyAIController::Investigate()
 
 		MoveToLocation(LastKnownLocation);
 
+		FTimerHandle InvestigateTimer;
+		GetWorld()->GetTimerManager().SetTimer(InvestigateTimer, this, &AEnemyAIController::DecideNextAction, 4.f, false);
 
 
 		APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);

@@ -102,7 +102,7 @@ private:
 
 	//Utility Modifiers
 
-	float PatrolUtilityModifier = .5f;
+	float PatrolUtilityModifier = .25f;
 	float AttackUtilityModifier = 1.f;
 	float ProvokableUtilityModifier = 3.f;
 

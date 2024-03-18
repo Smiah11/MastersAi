@@ -94,7 +94,7 @@ private:
 
 	const float HigherPriorityModifier = 10.f;
 	const float HighPriorityModifier = 2.f;
-	const float LowPriorityModifier = 0.5f;
+	const float LowPriorityModifier = 0.25f;
 	const float MediumPriorityModifier = 1.5f;
 
 

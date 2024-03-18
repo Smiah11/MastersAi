@@ -58,7 +58,7 @@ void AAIController1::Tick(float DeltaTime)
 
 	FaceLocation(CurrentTargetLocation);
 
-	//UE_LOG(LogTemp, Log, TEXT("Current Hour: %f"), CurrentHour); // Print the current hour to the log
+	UE_LOG(LogTemp, Log, TEXT("Current Hour: %f"), CurrentHour); // Print the current hour to the log
 
 	
 
@@ -256,7 +256,7 @@ float AAIController1::CalculatePatrolUtility() const
 	float Utility = (DistanceToPlayer / 1000.0f) * LowPriorityModifier; // The further the player, the higher the utility
 	//UE_LOG(LogTemp, Log, TEXT("Patrol Utility: %f"), Utility);
 	//UE_LOG(LogTemp, Log, TEXT("Patrol Utility Before Modifier: %f, Modifier: %f, Utility After Modifier: %f"), DistanceToPlayer / 1000.0f, LowPriorityModifier, Utility);
-	return Utility;
+	return Utility* LowPriorityModifier;
 }
 
 float AAIController1::CalculateReactToPlayerUtility() const
@@ -271,7 +271,7 @@ float AAIController1::CalculateReactToPlayerUtility() const
 float AAIController1::CalculateGoToWorkUtility() const
 {
 	bool IsWorkTime = CurrentHour >= WorkStart && CurrentHour < WorkEnd;// Check if it's work time
-	float Utility = IsWorkTime ? 1.f : 0.f; // If it's work time, the utility is 1, otherwise it's 0
+	float Utility = IsWorkTime ? 10.f : 0.f; // If it's work time, the utility is 1, otherwise it's 0
 	//UE_LOG(LogTemp, Log, TEXT("GoToWork Utility: %f"), Utility);
 	return Utility * HighPriorityModifier;
 }
@@ -282,7 +282,7 @@ float AAIController1::CalculateGoHomeUtility() const
 	float TirednessLevel = MyCharacter->GetTirednessLevel(); 
 	float BedTime = 22.f; // 10 PM
 	//bool IsPastWorkHours = CurrentHour >= WorkEnd;
-	float Utility = (TirednessLevel >= TirednessThreshold) || (CurrentHour >=BedTime) || ( CurrentHour < WorkStart) ? 1.f : 0.f; // If the character is tired or it's bed time hours, the utility is 1, otherwise it's 0
+	float Utility = (TirednessLevel >= TirednessThreshold) || (CurrentHour >=BedTime) || ( CurrentHour < WorkStart) ? 9.f : 0.f; // If the character is tired or it's bed time hours, the utility is 1, otherwise it's 0
 	//UE_LOG(LogTemp, Log, TEXT("GoHome Utility: %f"), Utility);
 	return Utility;
 }
@@ -291,7 +291,7 @@ float AAIController1::CalculateGoShopUtility() const
 {
 	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
 	float HungerLevel = MyCharacter->GetHungerLevel(); 
-	float Utility = ((HungerLevel >= HungerThreshold) ? 1.f : 0.f) * MediumPriorityModifier; 
+	float Utility = ((HungerLevel >= HungerThreshold) ? 11.f : 0.f) * MediumPriorityModifier; 
 	//UE_LOG(LogTemp, Log, TEXT("GoShop Utility: %f"), Utility);
 	return Utility;
 }
@@ -316,7 +316,7 @@ void AAIController1::OnUpdate()
 	DecideNextAction();
 
 	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
-	UE_LOG(LogTemp, Log, TEXT("Stats - Tiredness: %f, Hunger: %f"), MyCharacter->GetTirednessLevel(), MyCharacter->GetHungerLevel());
+	//UE_LOG(LogTemp, Log, TEXT("Stats - Tiredness: %f, Hunger: %f"), MyCharacter->GetTirednessLevel(), MyCharacter->GetHungerLevel());
 
 }
 
