@@ -61,13 +61,18 @@ public:
 
 	void SetGuardMaterial();
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+	float HungerLevel;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+	float TirednessLevel;
+
 private:
 
 	float LastHungerUpdateTime;
 	float LastTirednessUpdateTime;
 
-	float HungerLevel;
-	float TirednessLevel;
+
 
 	float HungerIncreaseRate;
 	float TirednessIncreaseRate;
