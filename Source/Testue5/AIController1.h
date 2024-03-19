@@ -75,7 +75,11 @@ public:
 
 	//float CalculatePriorityUtility() const;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Time")
+	float CurrentTime = 0.f; // Current time of day
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Time")
+	float CurrentHour = 0.f; // Current hour of day
 
 private:
 
@@ -119,9 +123,8 @@ private:
 	float WorkStart = 8.f; // 8am
 	float WorkEnd = 15.f; // 3pm
 
-	
-	float CurrentTime = 0.f; // Current time of day
-	float CurrentHour= 0.f; // Current hour of day
+
+	//float CurrentHour= 0.f; // Current hour of day
 
 
 
