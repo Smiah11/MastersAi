@@ -183,23 +183,29 @@ void AEnemyAIController::ExecuteAction(EAIState_Enemy Action)
 	switch (Action)
 	{
 	case EAIState_Enemy::Patrol:
+		CurrentState = EAIState_Enemy::Patrol;
 		SetMaxSpeed(350.f);
 		MoveToNextWaypoint();
 		break;
 	case EAIState_Enemy::Attack:
+		CurrentState = EAIState_Enemy::Attack;
 		Attack();
 		SetMaxSpeed(700.f);
 		break;
 	case EAIState_Enemy::Provokable:
+		CurrentState = EAIState_Enemy::Provokable;
 		Provoke();
 		break;
 	case EAIState_Enemy::Investigate:
+		CurrentState = EAIState_Enemy::Investigate;
 		Investigate();
 		break;
 	default:
 		UE_LOG(LogTemp, Warning, TEXT("Unhandled action in ExecuteAction"));
 		break;
 	}
+
+	OnStateChanged.Broadcast(CurrentState);
 }
 
 

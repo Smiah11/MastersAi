@@ -6,11 +6,10 @@
 #include "AIController.h"
 #include "Waypoints.h"
 #include "Perception/AIPerceptionTypes.h"
+#include "Delegates/Delegate.h"
+
 #include "EnemyAIController.generated.h"
 
-/**
- * 
- */
 
 UENUM(BlueprintType)
 enum class EAIState_Enemy : uint8
@@ -29,6 +28,8 @@ struct EnemyActionUtility
 	EnemyActionUtility(EAIState_Enemy InAction, float InUtility) : Action(InAction), Utility(InUtility) {}
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStateChanged, EAIState_Enemy, NewState);
+
 UCLASS()
 class TESTUE5_API AEnemyAIController : public AAIController
 {
@@ -44,6 +45,12 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void OnPossess(APawn* InPawn) override;
 
+
+	UPROPERTY(BlueprintAssignable)
+	FOnStateChanged OnStateChanged;
+
+	UFUNCTION(BlueprintCallable, Category = "AI")
+	EAIState_Enemy GetCurrentState() const { return CurrentState; }
 	
 
 	TArray<EnemyActionUtility> CalculateEnemyUtilities();
@@ -64,6 +71,12 @@ public:
 	void SetInRestrictedZone(bool bRestricted, FVector LastKnownPlayerLocation);
 
 	bool bInRestrictedZone;
+
+	// event dispatcher for state change
+
+
+
+
 
 
 protected:
