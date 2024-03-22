@@ -45,7 +45,7 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void OnPossess(APawn* InPawn) override;
 
-
+	// needed to have widgets updated without tick
 	UPROPERTY(BlueprintAssignable)
 	FOnStateChanged OnStateChanged;
 
