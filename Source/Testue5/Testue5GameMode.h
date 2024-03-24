@@ -12,7 +12,23 @@ class ATestue5GameMode : public AGameModeBase
 	GENERATED_BODY()
 
 public:
+
+
 	ATestue5GameMode();
+
+
+public:
+	virtual void BeginPlay() override;
+
+	virtual void Tick(float DeltaTime) override;
+
+	float CurrentTime = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = " Global Time")
+	float CurrentHour = 0.0f;
+
+	void UpdateTime(float DeltaTime);
+
 };
 
 

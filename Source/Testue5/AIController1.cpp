@@ -53,7 +53,14 @@ void AAIController1::Tick(float DeltaTime)
 
 	Super::Tick(DeltaTime);
 
-	UpdateCurrentTime(DeltaTime); // Update the current time
+
+	if (!bIsSliderActive)
+	{
+
+		UpdateCurrentTime(DeltaTime); // Update the current time
+		
+	}
+
 
 
 	FaceLocation(CurrentTargetLocation);
@@ -234,20 +241,46 @@ void AAIController1::FaceLocation(const FVector& Location)
 
 void AAIController1::UpdateCurrentTime(float DeltaTime)
 {
-	float SecondsInADay = 24 * 60 * 60; // 24 hours in game
-	float TimeScale = SecondsInADay / 600; // Real-life seconds to in-game time (10 mins)
 
-	// faster time progression
-	CurrentTime += DeltaTime * TimeScale;
 
-	// loops back to 0 when it reaches the end of the day
-	CurrentTime = FMath::Fmod(CurrentTime, SecondsInADay);
+	if (!bIsSliderActive)
+	{
+
+
+		float SecondsInADay = 24 * 60 * 60; // 24 hours in game
+		float TimeScale = SecondsInADay / 600; // Real-life seconds to in-game time (10 mins)
+
+		// faster time progression
+		CurrentTime += DeltaTime * TimeScale;
+
+		// loops back to 0 when it reaches the end of the day
+		CurrentTime = FMath::Fmod(CurrentTime, SecondsInADay);
+
+	}
 
 	// Convert seconds to hours for the current hour.
-	CurrentHour = CurrentTime / (60 * 60);
+	CurrentHour = CurrentTime / 3600; 
 
 	//UE_LOG(LogTemp, Warning, TEXT("Current Hour: %f"), CurrentHour);
 }
+
+void AAIController1::OnSliderValueChange(float SliderValue)
+{
+
+	CurrentTime = SliderValue * 3600; 
+	bIsSliderActive = true;
+
+	FTimerHandle TimerHandle;
+	GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &AAIController1::SetSliderFalse, 3.0f, false);
+
+}
+
+void AAIController1::SetSliderFalse()
+{
+		bIsSliderActive = false;
+}
+
+
 
 float AAIController1::CalculatePatrolUtility() const
 {

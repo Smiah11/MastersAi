@@ -75,11 +75,23 @@ public:
 
 	//float CalculatePriorityUtility() const;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Time")
 	float CurrentTime = 0.f; // Current time of day
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Time")
 	float CurrentHour = 0.f; // Current hour of day
+
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Time")
+	bool bIsSliderActive = false;
+
+	UFUNCTION(BlueprintCallable)
+	void OnSliderValueChange(float SliderValue);
+
+	
+	UFUNCTION(BlueprintCallable)
+	void SetSliderFalse();
+	
 
 private:
 
