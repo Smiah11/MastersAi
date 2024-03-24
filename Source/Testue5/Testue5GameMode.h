@@ -27,7 +27,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = " Global Time")
 	float CurrentHour = 0.0f;
 
+	UFUNCTION(BlueprintCallable)
+	void OnTimeSliderValueChanged(float SliderValue);
+
 	void UpdateTime(float DeltaTime);
+
+	bool IsSliderActive = false;
+
+	void SetSliderFalse();
 
 };
 
