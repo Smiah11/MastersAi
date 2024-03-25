@@ -25,16 +25,17 @@ AAIController1::AAIController1()
 	//CurrentState = EAIState::Patrol; // Default state is Patrol
 	//PrimaryActorTick.TickInterval = 1.f;
 	//PrimaryActorTick.bCanEverTick = false;
-	
+
 	
 }
 
 void AAIController1::BeginPlay()
 {
 	Super::BeginPlay();
+	InitialiseLocations();// Set up the initial locations for the AI
 	PopulateWaypointsInLevel();
 	SetupAI();
-	InitialiseLocations();// Set up the initial locations for the AI
+
 
 	// Set up a timer to update the AI every 2 seconds reducing tick reliance
 	GetWorld()->GetTimerManager().SetTimer(UpdateTimer, this, &AAIController1::OnUpdate, 0.1f, true,0.f);
@@ -44,7 +45,6 @@ void AAIController1::BeginPlay()
 
 }
 
-//// no use for tick anymore for now 
 
 void AAIController1::Tick(float DeltaTime)
 {
@@ -63,9 +63,9 @@ void AAIController1::Tick(float DeltaTime)
 
 
 
-	FaceLocation(CurrentTargetLocation);
+	//FaceLocation(CurrentTargetLocation);
 
-	UE_LOG(LogTemp, Log, TEXT("Current Hour: %f"), CurrentHour); // Print the current hour to the log
+	//UE_LOG(LogTemp, Log, TEXT("Current Hour: %f"), CurrentHour); // Print the current hour to the log
 
 	
 
@@ -212,7 +212,7 @@ void AAIController1::ReactToPlayer()
 
 		FVector PlayerLocation = PlayerPawn->GetActorLocation();
 
-		//FaceLocation(PlayerLocation);
+		FaceLocation(PlayerLocation);
 		CurrentTargetLocation = PlayerLocation;
 
 		UAnimInstance* AnimInstance = MyCharacter->GetMesh()->GetAnimInstance();
@@ -224,6 +224,8 @@ void AAIController1::ReactToPlayer()
 	}
 
 }
+
+
 
 
 void AAIController1::FaceLocation(const FVector& Location)
@@ -238,6 +240,7 @@ void AAIController1::FaceLocation(const FVector& Location)
 		MyPawn->SetActorRotation(TargetRotation);
 	}
 }
+
 
 void AAIController1::UpdateCurrentTime(float DeltaTime)
 {
@@ -304,9 +307,9 @@ float AAIController1::CalculateReactToPlayerUtility() const
 float AAIController1::CalculateGoToWorkUtility() const
 {
 	bool IsWorkTime = CurrentHour >= WorkStart && CurrentHour < WorkEnd;// Check if it's work time
-	float Utility = IsWorkTime ? 10.f : 0.f; // If it's work time, the utility is 1, otherwise it's 0
+	float Utility = IsWorkTime ? 12.f : 0.f; // If it's work time, the utility is 1, otherwise it's 0
 	//UE_LOG(LogTemp, Log, TEXT("GoToWork Utility: %f"), Utility);
-	return Utility * HighPriorityModifier;
+	return Utility;
 }
 
 float AAIController1::CalculateGoHomeUtility() const
@@ -315,7 +318,7 @@ float AAIController1::CalculateGoHomeUtility() const
 	float TirednessLevel = MyCharacter->GetTirednessLevel(); 
 	float BedTime = 22.f; // 10 PM
 	//bool IsPastWorkHours = CurrentHour >= WorkEnd;
-	float Utility = (TirednessLevel >= TirednessThreshold) || (CurrentHour >=BedTime) || ( CurrentHour < WorkStart) ? 9.f : 0.f; // If the character is tired or it's bed time hours, the utility is 1, otherwise it's 0
+	float Utility = (TirednessLevel >= TirednessThreshold) || (CurrentHour >=BedTime) || ( CurrentHour < WorkStart) ? 10.f : 0.f; // If the character is tired or it's bed time hours, the utility is 1, otherwise it's 0
 	//UE_LOG(LogTemp, Log, TEXT("GoHome Utility: %f"), Utility);
 	return Utility;
 }
@@ -324,7 +327,7 @@ float AAIController1::CalculateGoShopUtility() const
 {
 	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
 	float HungerLevel = MyCharacter->GetHungerLevel(); 
-	float Utility = ((HungerLevel >= HungerThreshold) ? 11.f : 0.f) * MediumPriorityModifier; 
+	float Utility = ((HungerLevel >= HungerThreshold) ? 8.f : 0.f); 
 	//UE_LOG(LogTemp, Log, TEXT("GoShop Utility: %f"), Utility);
 	return Utility;
 }
@@ -400,6 +403,13 @@ void AAIController1::InitialiseLocations() {
 	{
 		int RandomIndex = FMath::RandRange(0, WorkActors.Num() - 1);// Randomly select a work location
 		WorkLocation = WorkActors[RandomIndex]->GetActorLocation();
+		
+		//UE_LOG(LogTemp, Warning, TEXT("Work Location: %s"), *WorkLocation.ToString()); 
+
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No Work location found"));
 	}
 
 	// Find Home Location
@@ -410,19 +420,44 @@ void AAIController1::InitialiseLocations() {
 	{
 		int RandomIndex = FMath::RandRange(0, HomeActors.Num() - 1);// Randomly select a House location
 		HomeLocation = HomeActors[RandomIndex]->GetActorLocation();
+
+		//UE_LOG(LogTemp, Warning, TEXT("Home Location: %s"), *HomeLocation.ToString());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No Home location found"));
 	}
 
 	// Find Shopping Location
 	TArray<AActor*> ShopActors;
 	UGameplayStatics::GetAllActorsWithTag(World, FName("Shop"), ShopActors);
 	//UE_LOG(LogTemp, Warning, TEXT("Found %d Shop location(s)"), ShopActors.Num());
-
 	if (ShopActors.Num() > 0) 
 	{
 
-		int RandomIndex = FMath::RandRange(0, ShopActors.Num() - 1);// Randomly select a shop location
-		ShoppingLocation = ShopActors[RandomIndex]->GetActorLocation();
+		float MinDistance = FLT_MAX; // Start with the maximum possible distance
+		AActor* ClosestShop = nullptr;
+
+		for (AActor* ShopActor : ShopActors)
+		{
+			float Distance = FVector::Dist(HomeLocation, ShopActor->GetActorLocation());
+			if (Distance < MinDistance)
+			{
+				MinDistance = Distance;
+				ClosestShop = ShopActor;
+			}
+		}
+
+		if (ClosestShop != nullptr)
+		{
+			ShoppingLocation = ClosestShop->GetActorLocation();
+		}
 	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No Shop location found"));
+	}
+
 }
 
 TArray<CivillianActionUtility> AAIController1::CalculateCurrentUtilities() 
@@ -451,7 +486,7 @@ void AAIController1::DecreaseHungerValue()
 	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
 	MyCharacter->DecreaseHunger(100.f);
 	DecideNextAction();
-	UE_LOG(LogTemp, Log, TEXT("Hunger decreased. New value: %f"), MyCharacter->GetHungerLevel());
+	//UE_LOG(LogTemp, Log, TEXT("Hunger decreased. New value: %f"), MyCharacter->GetHungerLevel());
 }
 
 void AAIController1::DecreaseTirednessValue()
@@ -459,7 +494,7 @@ void AAIController1::DecreaseTirednessValue()
 	AAICharacter* MyCharacter = Cast<AAICharacter>(GetPawn());
 	MyCharacter->DecreaseTiredness(100.f);
 	DecideNextAction();
-	UE_LOG(LogTemp, Log, TEXT("Tiredness decreased. New value: %f"), MyCharacter->GetHungerLevel());
+	//UE_LOG(LogTemp, Log, TEXT("Tiredness decreased. New value: %f"), MyCharacter->GetHungerLevel());
 }
 
 void AAIController1::DecreaseTirednessAndHungerValue()
@@ -481,7 +516,7 @@ void AAIController1::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowin
 
 		SpawnNewWaypoint();
 		FTimerHandle TimerHandle;
-		GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &AAIController1::DecideNextAction, 0.1f, false);
+		GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &AAIController1::DecideNextAction, 1.f, false);
 		//DecideNextAction();
 		
 	}
@@ -562,6 +597,7 @@ void AAIController1::GoHome()
 
 		StopMovement();
 		GetWorld()->GetTimerManager().SetTimer(RestTimer, this, &AAIController1::DecreaseTirednessAndHungerValue, 10.f, false);
+		//Maybe if after they wake up for work they have random tiredness and hunger instead of starting at zero
 		
 		
 	}

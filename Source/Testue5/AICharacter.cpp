@@ -73,7 +73,7 @@ float AAICharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEve
         if (CivilianController)
         {
             // This AI is a civilian. Notify nearby guards to investigate the last known location of the player.
-            FVector LastKnownLocation = GetActorLocation(); // Assuming the last known location is the location of the civilian when damaged
+            FVector LastKnownLocation = GetActorLocation(); // the last known location is the location of incident
             TArray<AActor*> Guards;
             UGameplayStatics::GetAllActorsOfClass(GetWorld(), AEnemyAIController::StaticClass(), Guards);
             for (AActor* Guard : Guards)

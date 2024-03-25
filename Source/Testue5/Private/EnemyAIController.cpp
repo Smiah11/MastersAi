@@ -46,9 +46,6 @@ void AEnemyAIController::BeginPlay()
 	Super::BeginPlay();
 	SetupAI();
 	PopulateWaypointsInLevel();
-
-
-	
 } 
 
 void AEnemyAIController::Tick(float DeltaTime)
@@ -58,16 +55,11 @@ void AEnemyAIController::Tick(float DeltaTime)
 	DecideNextAction();
 	CheckPlayerProximity();
 
+	// check provoke bool log
+	//UE_LOG(LogTemp, Warning, TEXT("bIsProvoked: %s"), bIsProvoked ? TEXT("True") : TEXT("False"));
+
 
 }
-
-void AEnemyAIController::OnPossess(APawn* InPawn)
-{
-	Super::OnPossess(InPawn);
-	SetupAI();
-}
-
-
 
 void AEnemyAIController::SetupAI()
 {
@@ -145,7 +137,7 @@ float AEnemyAIController::CalculatePatrolUtility() const
 float AEnemyAIController::CalculateAttackUtility() const
 {
 
-	float Utility = bIsProvoked  ? 4.f : 0.f;  // if the player is provoked or in a restricted zone
+	float Utility = bIsProvoked  ? 4.f : 0.f;  // if the player is provoked
 
 	return Utility;
 
@@ -189,8 +181,8 @@ void AEnemyAIController::ExecuteAction(EAIState_Enemy Action)
 		break;
 	case EAIState_Enemy::Attack:
 		CurrentState = EAIState_Enemy::Attack;
-		Attack();
 		SetMaxSpeed(700.f);
+		Attack();
 		break;
 	case EAIState_Enemy::Provokable:
 		CurrentState = EAIState_Enemy::Provokable;
@@ -212,10 +204,16 @@ void AEnemyAIController::ExecuteAction(EAIState_Enemy Action)
 void AEnemyAIController::Attack()
 {
 
+	if (bIsProvoked == false)
+	{
+		return; 
+	}
+
 	FacePlayer();
 
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
 	ACharacter* MyCharacter = Cast<ACharacter>(GetPawn());
+
 
 
 
@@ -304,10 +302,7 @@ bool AEnemyAIController::FindSuitableNewWaypointLocation(FVector& OutLocation, f
 
 void AEnemyAIController::SpawnNewWaypoint()
 {
-	if (CurrentState != EAIState_Enemy::Patrol)
-	{
-		return;
-	}
+
 
 	FVector NewLocation;
 	const float MinDistance = 500.f; // Minimum distance from the current waypoint
@@ -359,7 +354,7 @@ void AEnemyAIController::CheckPlayerProximity()
 	{
 		DetectedPlayer = nullptr;
 		bIsProvoked = false;
-		UE_LOG(LogTemp, Warning, TEXT("Player is too far or not detected"));
+		//UE_LOG(LogTemp, Warning, TEXT("Player is too far or not detected"));
 	}
 
 	/*
@@ -426,7 +421,8 @@ void AEnemyAIController::FacePlayer()
 void AEnemyAIController::Provoke()
 {
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
-	
+	FTimerHandle PlayerProximity;
+
 	if (PlayerPawn)
 	{
 		float DistanceToPlayer = FVector::Dist(GetPawn()->GetActorLocation(), PlayerPawn->GetActorLocation());
@@ -436,17 +432,18 @@ void AEnemyAIController::Provoke()
 		{
 			FacePlayer();
 			StopMovement();
-
-
-	
-			FTimerHandle PlayerProximity;
+			
 			GetWorld()->GetTimerManager().SetTimer(PlayerProximity, this, &AEnemyAIController::SetProvoked, 5.0f, false);
 			
 
 		}
 		else
 		{
+
 			bIsProvoked = false;
+			// clear player proximity handle
+			GetWorld()->GetTimerManager().ClearTimer(PlayerProximity); 
+			
 		}
 
 
@@ -508,7 +505,14 @@ float AEnemyAIController::SetMaxSpeed(float Speed)
 void AEnemyAIController::SetProvoked()
 {
 
+	
+	// if the player is still in the provokable state then set provoked to true this is to prevent the AI from going into attack state when the player is not in the provokable state
+
+	if (CurrentState == EAIState_Enemy::Provokable)
+	{
 		bIsProvoked = true;
+	}
+		
 }
 
 void AEnemyAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)

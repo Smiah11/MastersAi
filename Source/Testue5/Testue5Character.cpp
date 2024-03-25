@@ -211,7 +211,7 @@ void ATestue5Character::Fire(const FInputActionValue& Value)
 
 		if (bHit && HitResult.GetActor())
 		{
-			// If we hit something, print the hit actor
+			// If we hit something print the hit actor
 			UE_LOG(LogTemp, Warning, TEXT("Hit Actor: %s"), *HitResult.GetActor()->GetName());
 			const float Damage = 50.f;
 			UGameplayStatics::ApplyDamage(HitResult.GetActor(), Damage, GetController(), this, UDamageType::StaticClass());
@@ -220,7 +220,7 @@ void ATestue5Character::Fire(const FInputActionValue& Value)
 		}
 		else
 		{
-			// If we didn't hit anything, print "No Hit"
+			// If we didn't hit anything
 			UE_LOG(LogTemp, Warning, TEXT("No Hit"));
 		}
 		
